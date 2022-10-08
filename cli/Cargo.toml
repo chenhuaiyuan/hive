@@ -1,0 +1,21 @@
+[package]
+name = "axua"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.21", features = ["macros", "rt"]}
+mlua = {version = "0.8", features = ["lua54", "async", "vendored", "serialize"]}
+hyper = {version = "0.14.20", features = ["server", "http1", "tcp"]}
+http = "0.2"
+http-body = "0.4"
+futures-util = "0.3"
+axum-core = "0.2.8"
+
+serde_urlencoded = "0.7.1"
+
+serde = {version = "1.0", features = ["derive"]}
+serde_json = "1.0"
+mime = "0.3.16"
