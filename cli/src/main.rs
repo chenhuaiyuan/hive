@@ -33,13 +33,13 @@ fn has_content_type(headers: &HeaderMap, expected_content_type: &mime::Mime) -> 
     content_type.starts_with(expected_content_type.as_ref())
 }
 
-struct LuaRequest(Request<Body>);
+struct LuaRequest(Request<Body>, SocketAddr);
 
 impl LuaUserData for LuaRequest {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
         _methods.add_async_function("params", |_lua, this: LuaAnyUserData| async move {
             let params_table = _lua.create_table()?;
-            let mut this = this.borrow_mut::<Self>()?;
+            let this = this.take::<Self>()?;
             if this.0.method() == Method::GET {
                 let query = this.0.uri().query().unwrap_or_default();
                 let value = serde_urlencoded::from_str::<Vec<(String, String)>>(query)
@@ -53,9 +53,7 @@ impl LuaUserData for LuaRequest {
                 if !has_content_type(this.0.headers(), &mime::APPLICATION_WWW_FORM_URLENCODED) {
                     return Err(WebError::invalid_form_content_type().to_lua_err());
                 }
-                let bytes = Bytes::from_request(&mut RequestParts::new(this.0))
-                    .await
-                    .to_lua_err()?;
+                let bytes = hyper::body::to_bytes(this.0).await.to_lua_err()?;
                 let value = serde_urlencoded::from_bytes::<Vec<(String, String)>>(&bytes)
                     .map_err(WebError::parse_params)
                     .to_lua_err()?;
@@ -65,6 +63,7 @@ impl LuaUserData for LuaRequest {
                 Ok(params_table)
             }
         });
+        _methods.add_method("remote_addr", |_, this, ()| Ok((this.1).to_string()));
     }
 }
 
@@ -81,14 +80,17 @@ impl Service<Request<Body>> for Svc {
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
         let lua = self.0.clone();
-        let lua_req = LuaRequest(req);
+        let method = req.method().as_str().to_string();
+        let path = req.uri().path().to_string();
+        let lua_req = LuaRequest(req, self.1);
 
-        let method = req.method().as_str();
-        let path = req.uri().path();
         Box::pin(async move {
-            let handler: LuaTable = lua.named_registry_value("http_handler")?;
+            let handler: LuaFunction = lua.named_registry_value("http_handler")?;
 
-            match handler.call_method::<_, _, LuaTable>("execute", (method, path, lua_req)) {
+            match handler
+                .call_async::<_, LuaTable>((method, path, lua_req))
+                .await
+            {
                 Ok(lua_resp) => {
                     let status = lua_resp
                         .get::<_, Option<u16>>("status")
@@ -114,10 +116,13 @@ impl Service<Request<Body>> for Svc {
 
                     Ok(resp.body(body).unwrap())
                 }
-                Err(err) => Ok(Response::builder()
-                    .status(500)
-                    .body(Body::from(r#"{{"code": 500, "message": "Call failed"}}"#))
-                    .unwrap()),
+                Err(err) => {
+                    println!("{:?}", err);
+                    Ok(Response::builder()
+                        .status(500)
+                        .body(Body::from(r#"{{"code": 500, "message": "Call failed"}}"#))
+                        .unwrap())
+                }
             }
         })
     }
@@ -146,14 +151,25 @@ async fn main() {
     let lua = Arc::new(Lua::new());
     let addr = ([127, 0, 0, 1], 3000).into();
 
-    let handler: LuaTable = lua
-        .load(include_str!("lua/index.lua"))
-        .eval()
-        .expect("cannot create lua handler");
+    let file = include_str!("lua/index.lua");
+
+    let handler: LuaFunction = lua.load(file).eval().expect("cannot create lua handler");
     lua.set_named_registry_value("http_handler", handler)
         .expect("connot store lua handler");
-    let server = Server::bind(&addr).serve(MakeSvc(lua));
+    let server = Server::bind(&addr).executor(LocalExec).serve(MakeSvc(lua));
 
     let local = tokio::task::LocalSet::new();
     local.run_until(server).await.expect("connot run server")
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LocalExec;
+
+impl<F> hyper::rt::Executor<F> for LocalExec
+where
+    F: std::future::Future + 'static, // not requiring `Send`
+{
+    fn execute(&self, fut: F) {
+        tokio::task::spawn_local(fut);
+    }
 }
