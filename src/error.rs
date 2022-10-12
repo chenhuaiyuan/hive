@@ -2,6 +2,8 @@ use std::fmt;
 
 use axum_core::extract::rejection::BytesRejection;
 use axum_core::response::IntoResponse;
+use axum_core::Error as AxumCoreError;
+use http::{header::HeaderValue, header::CONTENT_TYPE};
 use hyper::Error as HyperError;
 use mlua::Error as MLuaError;
 use std::net::AddrParseError;
@@ -51,10 +53,13 @@ impl std::error::Error for Error {}
 impl IntoResponse for Error {
     fn into_response(self) -> axum_core::response::Response {
         let resp = format!(
-            r#"{{"code": "{}", "message": "{}"}}"#,
+            r#"{{"code": "{}", "message": "{}", "data": ""}}"#,
             self.code, self.message
         );
-        resp.into_response()
+        let mut res = resp.into_response();
+        res.headers_mut()
+            .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+        res
     }
 }
 
@@ -78,6 +83,12 @@ impl From<HyperError> for Error {
 
 impl From<AddrParseError> for Error {
     fn from(value: AddrParseError) -> Self {
+        Self::new(2003, value.to_string())
+    }
+}
+
+impl From<AxumCoreError> for Error {
+    fn from(value: AxumCoreError) -> Self {
         Self::new(2003, value.to_string())
     }
 }
