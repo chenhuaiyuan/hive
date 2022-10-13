@@ -74,14 +74,19 @@ impl LuaUserData for HS256 {
             };
             let data = this
                 .key
-                .verify_token::<HashMap<String, JsonValue>>(&token, Some(options))
-                .to_lua_err()?;
-            let custom = data.custom;
-            let res = lua.create_table()?;
-            for (key, val) in custom {
-                res.set(key, json_value_to_lua_value(val, lua)?)?;
+                .verify_token::<HashMap<String, JsonValue>>(&token, Some(options));
+
+            match data {
+                Ok(val) => {
+                    let custom = val.custom;
+                    let res = lua.create_table()?;
+                    for (key, val) in custom {
+                        res.set(key, json_value_to_lua_value(val, lua)?)?;
+                    }
+                    Ok((LuaValue::Boolean(true), res))
+                }
+                Err(_) => Ok((LuaValue::Boolean(false), lua.create_table()?)),
             }
-            Ok(res)
         });
     }
 }

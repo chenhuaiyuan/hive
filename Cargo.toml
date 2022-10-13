@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.21", features = ["macros", "rt", "fs"]}
 mlua = {version = "0.8", features = ["lua54", "async", "vendored", "serialize"]}
-hyper = {version = "0.14.20", features = ["server", "http1", "tcp"]}
+hyper = {version = "0.14.20", features = ["server", "http1", "tcp", "stream"]}
 http = "0.2"
 http-body = "0.4"
 futures-util = "0.3"
@@ -29,3 +29,5 @@ nanoid = "0.4.0"
 jwt-simple = "0.11.1"
 
 multer = "2.0.4"
+
+ureq = {version = "2.5.0", features = ["json", "charset"]}

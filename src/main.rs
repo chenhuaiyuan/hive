@@ -1,26 +1,26 @@
 mod error;
+mod file;
 mod json;
 mod jwt_simple;
+mod lua_http;
 mod mysql;
 mod nanoid;
 
 use crate::error::{Error as WebError, Result as WebResult};
+use crate::file::File;
 use crate::json::create_table_to_json_string;
 use crate::jwt_simple::HS256;
+use crate::lua_http::Http;
 use crate::mysql::MysqlPool;
 use crate::nanoid::create_nanoid;
-use axum_core::response::IntoResponse;
 use clap::Parser;
 use futures_util::Future;
 use http::{header, HeaderMap, Method};
 use http::{header::HeaderValue, header::CONTENT_TYPE};
 use hyper::service::Service;
-use hyper::{
-    server::conn::AddrStream,
-    service::{make_service_fn, service_fn},
-    Body, Request, Response, Server,
-};
+use hyper::{server::conn::AddrStream, Body, Request, Response, Server};
 use mlua::prelude::*;
+use multer::Multipart;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -83,6 +83,62 @@ impl LuaUserData for LuaRequest {
                 headers.set(key, val)?;
             }
             Ok(headers)
+        });
+        _methods.add_async_function("form", |lua, this: LuaAnyUserData| async move {
+            let form_data = lua.create_table()?;
+            let this = this.take::<Self>()?;
+            if !has_content_type(this.0.headers(), &mime::MULTIPART_FORM_DATA) {
+                return Err(WebError::invalid_form_content_type().to_lua_err());
+            }
+            let boundary = this
+                .0
+                .headers()
+                .get(CONTENT_TYPE)
+                .and_then(|ct| ct.to_str().ok())
+                .and_then(|ct| multer::parse_boundary(ct).ok());
+
+            let mut multipart = Multipart::new(this.0.into_body(), boundary.unwrap());
+
+            while let Some(mut field) = multipart.next_field().await.to_lua_err()? {
+                let name = field.name().and_then(|v| Some(v.to_string()));
+
+                let file_name = field.file_name().and_then(|v| Some(v.to_string()));
+
+                let content_type = field.content_type().and_then(|v| Some(v.to_string()));
+
+                // println!(
+                //     "Name: {:?}, FileName: {:?}, Content-Type: {:?}",
+                //     name, file_name, content_type
+                // );
+
+                let mut field_data: Vec<u8> = Vec::new();
+                // let mut field_bytes_len = 0;
+                while let Some(field_chunk) = field.chunk().await.to_lua_err()? {
+                    // Do something with field chunk.
+                    // field_bytes_len += field_chunk.len();
+                    field_data.append(&mut field_chunk.to_vec())
+                    // println!("{:?}", field_chunk);
+                }
+
+                if let Some(file_name) = file_name.clone() {
+                    let field_name = name.clone().unwrap_or("default".to_string());
+                    let content_type = content_type
+                        .clone()
+                        .unwrap_or("multipart/form-data".to_string());
+                    let file = File::new(field_name.clone(), file_name, content_type, field_data);
+                    form_data.set(field_name, file)?;
+                } else {
+                    if let Some(field_name) = name.clone() {
+                        let data =
+                            lua.create_string(&String::from_utf8(field_data).to_lua_err()?)?;
+                        form_data.set(field_name, data)?;
+                    }
+                }
+
+                // println!("Field Bytes Length: {:?}", field_bytes_len);
+            }
+
+            Ok(form_data)
         });
     }
 }
@@ -245,6 +301,8 @@ async fn main() -> WebResult<()> {
     globals.set("tableToJsonStr", create_table_to_json_string(&lua)?)?;
     globals.set("nanoid", create_nanoid(&lua)?)?;
     globals.set("JWTHS256", lua.create_proxy::<HS256>()?)?;
+    globals.set("File", lua.create_proxy::<File>()?)?;
+    globals.set("Http", lua.create_proxy::<Http>()?)?;
 
     let file = tokio::fs::read_to_string(args.file)
         .await
