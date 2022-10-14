@@ -1,3 +1,4 @@
+mod crypto;
 mod error;
 mod file;
 mod json;
@@ -6,6 +7,7 @@ mod lua_http;
 mod mysql;
 mod nanoid;
 
+use crate::crypto::LuaCrypto;
 use crate::error::{Error as WebError, Result as WebResult};
 use crate::file::File;
 use crate::json::create_table_to_json_string;
@@ -143,62 +145,6 @@ impl LuaUserData for LuaRequest {
     }
 }
 
-// async fn run_server(handler: LuaFunction<'static>, lua: &Lua) -> WebResult<()> {
-//     let make_svc = make_service_fn(|socket: &AddrStream| {
-//         let remote_addr = socket.remote_addr();
-//         let handler = handler.clone();
-//         async move {
-//             Ok::<_, WebError>(service_fn(move |req: Request<Body>| {
-//                 let handler = handler.clone();
-//                 let method = req.method().as_str().to_string();
-//                 let path = req.uri().path().to_string();
-//                 async move {
-//                     let lua_req = LuaRequest(req, remote_addr);
-//                     let lua_resp: LuaTable = handler.call_async((method, path, lua_req)).await?;
-//                     let status = lua_resp
-//                         .get::<_, Option<u16>>("status")
-//                         .to_lua_err()?
-//                         .unwrap_or(200);
-//                     let mut resp = Response::builder().status(status);
-
-//                     if let Some(headers) = lua_resp
-//                         .get::<_, Option<LuaTable>>("headers")
-//                         .to_lua_err()?
-//                     {
-//                         for pair in headers.pairs::<String, LuaString>() {
-//                             let (h, v) = pair.to_lua_err()?;
-//                             resp = resp.header(&h, v.as_bytes());
-//                         }
-//                     }
-
-//                     let body = lua_resp
-//                         .get::<_, Option<LuaString>>("body")
-//                         .to_lua_err()?
-//                         .map(|b| {
-//                             // let b = serde_json::to_string(&b).unwrap();
-//                             Body::from(b.as_bytes().to_vec())
-//                         })
-//                         .unwrap_or_else(Body::empty);
-
-//                     Ok::<_, WebError>(resp.body(Body::from(body)).unwrap())
-//                 }
-//             }))
-//         }
-//     });
-
-//     let localhost: String = lua.globals().get("LOCALHOST")?;
-
-//     // let addr = ([127, 0, 0, 1], 3000).into();
-//     let addr = localhost.parse()?;
-//     let server = Server::bind(&addr).executor(LocalExec).serve(make_svc);
-
-//     println!("Listening on http://{}", addr);
-
-//     let local = tokio::task::LocalSet::new();
-//     local.run_until(server).await?;
-//     Ok(())
-// }
-
 struct Svc(Rc<Lua>, SocketAddr);
 
 impl Service<Request<Body>> for Svc {
@@ -292,7 +238,10 @@ async fn main() -> WebResult<()> {
     let args = Args::parse();
 
     // let lua = Lua::new().into_static();
-    let lua = Rc::new(Lua::new());
+    let lua;
+    unsafe {
+        lua = Rc::new(Lua::unsafe_new());
+    }
     let lua_clone = lua.clone();
 
     let globals = lua_clone.globals();
@@ -303,6 +252,8 @@ async fn main() -> WebResult<()> {
     globals.set("JWTHS256", lua.create_proxy::<HS256>()?)?;
     globals.set("File", lua.create_proxy::<File>()?)?;
     globals.set("Http", lua.create_proxy::<Http>()?)?;
+
+    lua.set_named_registry_value("crypto", LuaCrypto)?;
 
     let file = tokio::fs::read_to_string(args.file)
         .await

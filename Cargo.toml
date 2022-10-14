@@ -31,3 +31,5 @@ jwt-simple = "0.11.1"
 multer = "2.0.4"
 
 ureq = {version = "2.5.0", features = ["json", "charset"]}
+
+scrypt = "0.10.0"
