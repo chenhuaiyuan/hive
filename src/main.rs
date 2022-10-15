@@ -252,8 +252,10 @@ async fn main() -> WebResult<()> {
     globals.set("JWTHS256", lua.create_proxy::<HS256>()?)?;
     globals.set("File", lua.create_proxy::<File>()?)?;
     globals.set("Http", lua.create_proxy::<Http>()?)?;
+    globals.set("Crypto", lua.create_proxy::<LuaCrypto>()?)?;
 
-    lua.set_named_registry_value("crypto", LuaCrypto)?;
+    // let env = lua.create_table()?;
+    // env.set("crypto", LuaCrypto)?;
 
     let file = tokio::fs::read_to_string(args.file)
         .await
