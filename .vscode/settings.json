@@ -1,0 +1,11 @@
+{
+  "Lua.diagnostics.globals": [
+    "MysqlPool",
+    "exec",
+    "nanoid",
+    "tableToJsonStr",
+    "JWTHS256",
+    "Http",
+    "Crypto"
+  ]
+}
