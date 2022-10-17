@@ -8,7 +8,7 @@ mod mysql;
 mod nanoid;
 
 use crate::crypto::LuaCrypto;
-use crate::error::{Error as WebError, Result as WebResult};
+use crate::error::{create_error, Error as WebError, Result as WebResult};
 use crate::file::File;
 use crate::json::create_table_to_json_string;
 use crate::jwt_simple::HS256;
@@ -196,16 +196,70 @@ impl Service<Request<Body>> for Svc {
                 }
                 Err(err) => {
                     println!("{:?}", err);
+                    let (code, message) = return_err_info(err);
                     Ok(Response::builder()
-                        .status(500)
+                        .status(200)
                         .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
-                        .body(Body::from(
-                            r#"{"code": 500, "message": "Call failed", "data": ""}"#,
-                        ))
+                        .body(Body::from(format!(
+                            r#"{{"code": {}, "message": "{}", "data": ""}}"#,
+                            code, message
+                        )))
                         .unwrap())
                 }
             }
         })
+    }
+}
+
+fn return_err_info(err: LuaError) -> (u16, String) {
+    match err {
+        LuaError::SyntaxError {
+            message,
+            incomplete_input: _,
+        } => (4005, message),
+        LuaError::RuntimeError(v) => (4006, v),
+        LuaError::MemoryError(v) => (4007, v),
+        LuaError::SafetyError(v) => (4009, v),
+        LuaError::ToLuaConversionError {
+            from: _,
+            to: _,
+            message,
+        } => (
+            4010,
+            message.unwrap_or("To Lua Conversion Error".to_string()),
+        ),
+        LuaError::FromLuaConversionError {
+            from: _,
+            to: _,
+            message,
+        } => (
+            4011,
+            message.unwrap_or("From Lua Conversion Error".to_string()),
+        ),
+        LuaError::MetaMethodRestricted(v) => (4012, v),
+        LuaError::MetaMethodTypeError {
+            method: _,
+            type_name: _,
+            message,
+        } => (
+            4013,
+            message.unwrap_or("Meta Method Type Error".to_string()),
+        ),
+        LuaError::CallbackError {
+            traceback: _,
+            cause,
+        } => {
+            let err = cause.as_ref();
+            return_err_info(err.clone())
+        }
+        LuaError::SerializeError(v) => (4015, v),
+        LuaError::DeserializeError(v) => (4016, v),
+        LuaError::ExternalError(v) => {
+            let s = v.as_ref().to_string();
+            let r: Vec<&str> = s.split(',').collect();
+            (r[0].parse::<u16>().unwrap_or(500u16), r[1].to_string())
+        }
+        _ => (4017, err.to_string()),
     }
 }
 
@@ -253,6 +307,7 @@ async fn main() -> WebResult<()> {
     globals.set("File", lua.create_proxy::<File>()?)?;
     globals.set("Http", lua.create_proxy::<Http>()?)?;
     globals.set("Crypto", lua.create_proxy::<LuaCrypto>()?)?;
+    globals.set("WebError", create_error(&lua)?)?;
 
     // let env = lua.create_table()?;
     // env.set("crypto", LuaCrypto)?;
@@ -270,9 +325,6 @@ async fn main() -> WebResult<()> {
 
     let local = tokio::task::LocalSet::new();
     local.run_until(server).await?;
-
-    // run_server(handler, lua).await?;
-    // unsafe { Lua::from_static(lua) };
     Ok(())
 }
 

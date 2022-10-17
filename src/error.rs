@@ -1,11 +1,12 @@
 use std::fmt;
+use std::sync::Arc;
 
 use axum_core::extract::rejection::BytesRejection;
 use axum_core::response::IntoResponse;
 use axum_core::Error as AxumCoreError;
 use http::{header::HeaderValue, header::CONTENT_TYPE};
 use hyper::Error as HyperError;
-use mlua::Error as MLuaError;
+use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use std::net::AddrParseError;
 
 #[derive(Debug)]
@@ -15,6 +16,14 @@ pub struct Error {
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+pub fn create_error<'a>(lua: &'a Lua) -> LuaResult<LuaFunction> {
+    let func = lua.create_function(|_, (code, message): (u16, String)| {
+        let err = Error::new(code, message);
+        Err::<(), MLuaError>(MLuaError::ExternalError(Arc::new(err)))
+    });
+    func
+}
 
 impl Error {
     pub fn new<T>(code: u16, message: T) -> Self
@@ -44,7 +53,7 @@ impl Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "code: {}, message: {}", self.code, self.message)
+        write!(f, "{},{}", self.code, self.message)
     }
 }
 

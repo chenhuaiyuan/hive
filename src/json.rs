@@ -1,5 +1,5 @@
 use mlua::prelude::*;
-use serde_json::value as JsonValue;
+// use serde_json::value as JsonValue;
 
 pub fn create_table_to_json_string<'a>(lua: &'a Lua) -> LuaResult<LuaFunction> {
     let json_func = lua.create_function(|_, table: LuaTable| {
@@ -9,16 +9,16 @@ pub fn create_table_to_json_string<'a>(lua: &'a Lua) -> LuaResult<LuaFunction> {
     json_func
 }
 
-fn lua_value_to_json_value(val: LuaValue, lua: &Lua) -> LuaResult<JsonValue> {
-    match val {
-        LuaValue::Nil => Ok(JsonValue::Null),
-        LuaValue::Boolean(v) => Ok(JsonValue::Bool(v)),
-        LuaValue::Integer(v) => Ok(JsonValue::from(v)),
-        LuaValue::Number(v) => Ok(JsonValue::from(v)),
-        LuaValue::String(v) => {
-            let data = v.to_str()?;
-            Ok(JsonValue::from_str(data).to_lua_err()?)
-        }
-        _ => Ok(JsonValue::Null),
-    }
-}
+// fn lua_value_to_json_value(val: LuaValue, lua: &Lua) -> LuaResult<JsonValue> {
+//     match val {
+//         LuaValue::Nil => Ok(JsonValue::Null),
+//         LuaValue::Boolean(v) => Ok(JsonValue::Bool(v)),
+//         LuaValue::Integer(v) => Ok(JsonValue::from(v)),
+//         LuaValue::Number(v) => Ok(JsonValue::from(v)),
+//         LuaValue::String(v) => {
+//             let data = v.to_str()?;
+//             Ok(JsonValue::from_str(data).to_lua_err()?)
+//         }
+//         _ => Ok(JsonValue::Null),
+//     }
+// }

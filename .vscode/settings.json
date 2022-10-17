@@ -6,6 +6,7 @@
     "tableToJsonStr",
     "JWTHS256",
     "Http",
-    "Crypto"
+    "Crypto",
+    "WebError"
   ]
 }
