@@ -43,12 +43,12 @@ impl Error {
         }
     }
 
-    pub(crate) fn invalid_form_content_type() -> Self {
-        Self {
-            code: 3001u16,
-            message: "Invalid Form Content Type".to_string(),
-        }
-    }
+    // pub(crate) fn invalid_form_content_type() -> Self {
+    //     Self {
+    //         code: 3001u16,
+    //         message: "Invalid Form Content Type".to_string(),
+    //     }
+    // }
 }
 
 impl fmt::Display for Error {

@@ -63,7 +63,7 @@ impl LuaUserData for LuaRequest {
                 Ok(params_table)
             } else {
                 if !has_content_type(this.0.headers(), &mime::APPLICATION_WWW_FORM_URLENCODED) {
-                    return Err(WebError::invalid_form_content_type().to_lua_err());
+                    return Ok(params_table);
                 }
                 let bytes = hyper::body::to_bytes(this.0).await.to_lua_err()?;
                 let value = serde_urlencoded::from_bytes::<Vec<(String, String)>>(&bytes)
@@ -75,7 +75,7 @@ impl LuaUserData for LuaRequest {
                 Ok(params_table)
             }
         });
-        _methods.add_method("remote_addr", |_, this, ()| Ok((this.1).to_string()));
+        _methods.add_method("remoteAddr", |_, this, ()| Ok((this.1).to_string()));
         _methods.add_method("headers", |lua, this, ()| {
             let headers = lua.create_table()?;
             let headers_raw = this.0.headers();
@@ -90,7 +90,7 @@ impl LuaUserData for LuaRequest {
             let form_data = lua.create_table()?;
             let this = this.take::<Self>()?;
             if !has_content_type(this.0.headers(), &mime::MULTIPART_FORM_DATA) {
-                return Err(WebError::invalid_form_content_type().to_lua_err());
+                return Ok(form_data);
             }
             let boundary = this
                 .0
@@ -136,8 +136,6 @@ impl LuaUserData for LuaRequest {
                         form_data.set(field_name, data)?;
                     }
                 }
-
-                // println!("Field Bytes Length: {:?}", field_bytes_len);
             }
 
             Ok(form_data)
