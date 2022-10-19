@@ -55,9 +55,9 @@ impl LuaUserData for MysqlPool {
             let row: Option<Row> = conn.query_first(sql).await.to_lua_err()?;
             if let Some(mut row) = row {
                 let data = row_to_table!(row, lua);
-                return Ok(data);
+                Ok(data)
             } else {
-                return lua.create_table();
+                lua.create_table()
             }
         });
         _methods.add_async_method(
@@ -129,9 +129,9 @@ impl LuaUserData for MysqlPool {
 
                 if let Some(mut row) = row {
                     let data = row_to_table!(row, lua);
-                    return Ok(data);
+                    Ok(data)
                 } else {
-                    return lua.create_table();
+                    lua.create_table()
                 }
             },
         );
@@ -168,24 +168,16 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaValue {
         MysqlValue::NULL => {
             let data = lua.create_string("");
             match data {
-                Ok(val) => {
-                    return LuaValue::String(val);
-                }
-                Err(_) => {
-                    return LuaValue::Nil;
-                }
+                Ok(val) => LuaValue::String(val),
+                Err(_) => LuaValue::Nil,
             }
         }
         MysqlValue::Bytes(v) => {
             // let data = String::from_utf8(v).unwrap_or_else(|_| String::from(""));
             let data = lua.create_string(&v);
             match data {
-                Ok(val) => {
-                    return LuaValue::String(val);
-                }
-                Err(_) => {
-                    return LuaValue::Nil;
-                }
+                Ok(val) => LuaValue::String(val),
+                Err(_) => LuaValue::Nil,
             }
         }
         MysqlValue::Int(v) => LuaValue::Integer(v),
@@ -196,24 +188,16 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaValue {
             let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
             let data = lua.create_string(&date);
             match data {
-                Ok(val) => {
-                    return LuaValue::String(val);
-                }
-                Err(_) => {
-                    return LuaValue::Nil;
-                }
+                Ok(val) => LuaValue::String(val),
+                Err(_) => LuaValue::Nil,
             }
         }
         MysqlValue::Time(_, _, h, m, s, _) => {
             let time = format!("{:02}:{:02}:{:02}", h, m, s);
             let data = lua.create_string(&time);
             match data {
-                Ok(val) => {
-                    return LuaValue::String(val);
-                }
-                Err(_) => {
-                    return LuaValue::Nil;
-                }
+                Ok(val) => LuaValue::String(val),
+                Err(_) => LuaValue::Nil,
             }
         }
     }
@@ -224,9 +208,9 @@ fn lua_value_to_mysql_value(val: LuaValue) -> MysqlValue {
         LuaValue::Nil => MysqlValue::NULL,
         LuaValue::Boolean(v) => {
             if v {
-                return MysqlValue::from(1);
+                MysqlValue::from(1)
             } else {
-                return MysqlValue::from(0);
+                MysqlValue::from(0)
             }
         }
         LuaValue::LightUserData(_) => MysqlValue::NULL,
@@ -235,7 +219,7 @@ fn lua_value_to_mysql_value(val: LuaValue) -> MysqlValue {
         LuaValue::String(v) => {
             let data = v.as_bytes();
             let data = Vec::from(data);
-            return MysqlValue::Bytes(data);
+            MysqlValue::Bytes(data)
         }
         LuaValue::Table(_) => MysqlValue::NULL,
         LuaValue::Function(_) => MysqlValue::NULL,

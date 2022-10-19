@@ -17,12 +17,11 @@ pub struct Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub fn create_error<'a>(lua: &'a Lua) -> LuaResult<LuaFunction> {
-    let func = lua.create_function(|_, (code, message): (u16, String)| {
+pub fn create_error(lua: &Lua) -> LuaResult<LuaFunction> {
+    lua.create_function(|_, (code, message): (u16, String)| {
         let err = Error::new(code, message);
         Err::<(), MLuaError>(MLuaError::ExternalError(Arc::new(err)))
-    });
-    func
+    })
 }
 
 impl Error {

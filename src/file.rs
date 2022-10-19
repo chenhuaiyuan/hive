@@ -44,7 +44,7 @@ impl LuaUserData for File {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
         _methods.add_async_function(
             "save",
-            |_, (this, path): (LuaAnyUserData, LuaMultiValue)| async move {
+            |lua, (this, path): (LuaAnyUserData, LuaMultiValue)| async move {
                 let alphabet = [
                     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
                     'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
@@ -60,14 +60,16 @@ impl LuaUserData for File {
                         let random_name = nanoid!(16, &alphabet) + ".";
 
                         let new_file_name = random_name + suffix;
-                        let mut file = fs::File::create(new_file_name).await.to_lua_err()?;
+                        let mut file =
+                            fs::File::create(new_file_name.clone()).await.to_lua_err()?;
                         file.write_all(&this.content).await.to_lua_err()?;
                         // fs::write(new_file_name, this.content.as_ref())
                         //     .await
                         //     .to_lua_err()?;
-                        return Ok(true);
+                        let file_name = lua.create_string(&new_file_name)?;
+                        return Ok((true, file_name));
                     }
-                    return Ok(false);
+                    return Ok((false, lua.create_string(&"")?));
                 }
                 let path = path.into_vec();
                 if path.len() == 1 {
@@ -88,15 +90,17 @@ impl LuaUserData for File {
                             let random_name = nanoid!(16, &alphabet) + ".";
 
                             let new_file_name = p + &random_name + suffix;
-                            let mut file = fs::File::create(new_file_name).await.to_lua_err()?;
+                            let mut file =
+                                fs::File::create(new_file_name.clone()).await.to_lua_err()?;
                             file.write_all(&this.content).await.to_lua_err()?;
                             // fs::write(new_file_name, this.content.as_ref())
                             //     .await
                             //     .to_lua_err()?;
-                            return Ok(true);
+                            let file_name = lua.create_string(&new_file_name)?;
+                            return Ok((true, file_name));
                         }
                         _ => {
-                            return Ok(false);
+                            return Ok((false, lua.create_string(&"")?));
                         }
                     }
                 } else if path.len() >= 2 {
@@ -116,25 +120,27 @@ impl LuaUserData for File {
                                     let file_name = f.to_str()?;
 
                                     let new_file_name = p + file_name;
-                                    let mut file =
-                                        fs::File::create(new_file_name).await.to_lua_err()?;
+                                    let mut file = fs::File::create(new_file_name.clone())
+                                        .await
+                                        .to_lua_err()?;
                                     file.write_all(&this.content).await.to_lua_err()?;
                                     // fs::write(new_file_name, this.content.as_ref())
                                     //     .await
                                     //     .to_lua_err()?;
-                                    return Ok(true);
+                                    let file_name = lua.create_string(&new_file_name)?;
+                                    return Ok((true, file_name));
                                 }
                                 _ => {
-                                    return Ok(false);
+                                    return Ok((false, lua.create_string(&"")?));
                                 }
                             }
                         }
                         _ => {
-                            return Ok(false);
+                            return Ok((false, lua.create_string(&"")?));
                         }
                     }
                 }
-                Ok(false)
+                Ok((false, lua.create_string(&"")?))
             },
         );
     }

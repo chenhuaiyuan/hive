@@ -35,37 +35,35 @@ impl LuaUserData for HS256 {
             let mut token_data = HashMap::new();
             for pair in data.pairs::<LuaValue, LuaValue>() {
                 let (key, value) = pair?;
-                match key {
-                    LuaValue::String(k) => {
-                        let k = k.to_str()?.to_string();
-                        match value {
-                            LuaValue::Integer(v) => {
-                                token_data.insert(k, JsonValue::from(v));
-                            }
-                            LuaValue::Number(v) => {
-                                token_data.insert(k, JsonValue::from(v));
-                            }
-                            LuaValue::String(v) => {
-                                token_data.insert(k, JsonValue::from(v.to_str()?));
-                            }
-                            LuaValue::Nil => {
-                                token_data.insert(k, JsonValue::Null);
-                            }
-                            LuaValue::Boolean(v) => {
-                                token_data.insert(k, JsonValue::Bool(v));
-                            }
-                            _ => {}
+                if let LuaValue::String(k) = key {
+                    let k = k.to_str()?.to_string();
+                    match value {
+                        LuaValue::Integer(v) => {
+                            token_data.insert(k, JsonValue::from(v));
                         }
+                        LuaValue::Number(v) => {
+                            token_data.insert(k, JsonValue::from(v));
+                        }
+                        LuaValue::String(v) => {
+                            token_data.insert(k, JsonValue::from(v.to_str()?));
+                        }
+                        LuaValue::Nil => {
+                            token_data.insert(k, JsonValue::Null);
+                        }
+                        LuaValue::Boolean(v) => {
+                            token_data.insert(k, JsonValue::Bool(v));
+                        }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
+
             if let Some(duration) = this.duration {
                 claims = Claims::with_custom_claims(token_data, duration);
             } else {
                 claims = Claims::with_custom_claims(token_data, Duration::from_hours(1));
             }
-            Ok(this.key.authenticate(claims).to_lua_err()?)
+            this.key.authenticate(claims).to_lua_err()
         });
         _methods.add_method("verify", |lua, this, token: String| {
             let options = VerificationOptions {

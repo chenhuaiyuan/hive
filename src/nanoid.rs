@@ -1,8 +1,8 @@
 use mlua::prelude::*;
 use nanoid::nanoid;
 
-pub fn create_nanoid<'a>(lua: &'a Lua) -> LuaResult<LuaFunction> {
-    let func = lua.create_function(|lua, mut params: LuaMultiValue| {
+pub fn create_nanoid(lua: &Lua) -> LuaResult<LuaFunction> {
+    lua.create_function(|lua, mut params: LuaMultiValue| {
         let nid;
         if params.is_empty() {
             nid = nanoid!();
@@ -90,6 +90,5 @@ pub fn create_nanoid<'a>(lua: &'a Lua) -> LuaResult<LuaFunction> {
             }
         }
         lua.create_string(&nid)
-    });
-    func
+    })
 }

@@ -102,11 +102,11 @@ impl LuaUserData for LuaRequest {
             let mut multipart = Multipart::new(this.0.into_body(), boundary.unwrap());
 
             while let Some(mut field) = multipart.next_field().await.to_lua_err()? {
-                let name = field.name().and_then(|v| Some(v.to_string()));
+                let name = field.name().map(|v| v.to_string());
 
-                let file_name = field.file_name().and_then(|v| Some(v.to_string()));
+                let file_name = field.file_name().map(|v| v.to_string());
 
-                let content_type = field.content_type().and_then(|v| Some(v.to_string()));
+                let content_type = field.content_type().map(|v| v.to_string());
 
                 // println!(
                 //     "Name: {:?}, FileName: {:?}, Content-Type: {:?}",
@@ -123,18 +123,15 @@ impl LuaUserData for LuaRequest {
                 }
 
                 if let Some(file_name) = file_name.clone() {
-                    let field_name = name.clone().unwrap_or("default".to_string());
+                    let field_name = name.clone().unwrap_or_else(|| "default".to_string());
                     let content_type = content_type
                         .clone()
-                        .unwrap_or("multipart/form-data".to_string());
+                        .unwrap_or_else(|| "multipart/form-data".to_string());
                     let file = File::new(field_name.clone(), file_name, content_type, field_data);
                     form_data.set(field_name, file)?;
-                } else {
-                    if let Some(field_name) = name.clone() {
-                        let data =
-                            lua.create_string(&String::from_utf8(field_data).to_lua_err()?)?;
-                        form_data.set(field_name, data)?;
-                    }
+                } else if let Some(field_name) = name.clone() {
+                    let data = lua.create_string(&String::from_utf8(field_data).to_lua_err()?)?;
+                    form_data.set(field_name, data)?;
                 }
             }
 
@@ -224,7 +221,7 @@ fn return_err_info(err: LuaError) -> (u16, String) {
             message,
         } => (
             4010,
-            message.unwrap_or("To Lua Conversion Error".to_string()),
+            message.unwrap_or_else(|| "To Lua Conversion Error".to_string()),
         ),
         LuaError::FromLuaConversionError {
             from: _,
@@ -232,7 +229,7 @@ fn return_err_info(err: LuaError) -> (u16, String) {
             message,
         } => (
             4011,
-            message.unwrap_or("From Lua Conversion Error".to_string()),
+            message.unwrap_or_else(|| "From Lua Conversion Error".to_string()),
         ),
         LuaError::MetaMethodRestricted(v) => (4012, v),
         LuaError::MetaMethodTypeError {
@@ -241,7 +238,7 @@ fn return_err_info(err: LuaError) -> (u16, String) {
             message,
         } => (
             4013,
-            message.unwrap_or("Meta Method Type Error".to_string()),
+            message.unwrap_or_else(|| "Meta Method Type Error".to_string()),
         ),
         LuaError::CallbackError {
             traceback: _,
