@@ -1,3 +1,5 @@
+use std::path::Path;
+
 use mlua::prelude::*;
 use nanoid::nanoid;
 use tokio::fs;
@@ -84,19 +86,26 @@ impl LuaUserData for File {
                                 p.push('/');
                             }
 
+                            let dir = Path::new(&p);
+
+                            if !dir.exists() {
+                                fs::create_dir_all(dir).await.to_lua_err()?;
+                            }
+
                             let file: Vec<&str> = this.file_name.split('.').collect();
                             let suffix = file[1];
 
                             let random_name = nanoid!(16, &alphabet) + ".";
 
-                            let new_file_name = p + &random_name + suffix;
+                            let new_file_name = dir.join(random_name + suffix);
                             let mut file =
                                 fs::File::create(new_file_name.clone()).await.to_lua_err()?;
                             file.write_all(&this.content).await.to_lua_err()?;
                             // fs::write(new_file_name, this.content.as_ref())
                             //     .await
                             //     .to_lua_err()?;
-                            let file_name = lua.create_string(&new_file_name)?;
+                            let f_name = new_file_name.to_str().unwrap_or("");
+                            let file_name = lua.create_string(&f_name)?;
                             return Ok((true, file_name));
                         }
                         _ => {
@@ -115,11 +124,17 @@ impl LuaUserData for File {
                                 p.push('/');
                             }
 
+                            let dir = Path::new(&p);
+
+                            if !dir.exists() {
+                                fs::create_dir_all(dir).await.to_lua_err()?;
+                            }
+
                             match path[1].clone() {
                                 LuaValue::String(f) => {
                                     let file_name = f.to_str()?;
 
-                                    let new_file_name = p + file_name;
+                                    let new_file_name = dir.join(file_name);
                                     let mut file = fs::File::create(new_file_name.clone())
                                         .await
                                         .to_lua_err()?;
@@ -127,7 +142,8 @@ impl LuaUserData for File {
                                     // fs::write(new_file_name, this.content.as_ref())
                                     //     .await
                                     //     .to_lua_err()?;
-                                    let file_name = lua.create_string(&new_file_name)?;
+                                    let f_name = new_file_name.to_str().unwrap_or("");
+                                    let file_name = lua.create_string(&f_name)?;
                                     return Ok((true, file_name));
                                 }
                                 _ => {
