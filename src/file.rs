@@ -1,5 +1,8 @@
+use std::ffi::OsStr;
 use std::path::Path;
+use std::sync::Arc;
 
+use crate::error::Error as WebError;
 use mlua::prelude::*;
 use nanoid::nanoid;
 use tokio::fs;
@@ -9,7 +12,7 @@ pub struct File {
     field_name: String,
     file_name: String,
     content_type: String,
-    content: Vec<u8>,
+    pub content: Vec<u8>,
 }
 
 impl File {
@@ -159,5 +162,101 @@ impl LuaUserData for File {
                 Ok((false, lua.create_string(&"")?))
             },
         );
+        _methods.add_async_function("new", |_, file_path: String| async move {
+            let path = Path::new(&file_path);
+
+            if path.exists() {
+                if path.is_file() {
+                    let file_name = path
+                        .file_name()
+                        .unwrap_or_else(|| OsStr::new("default.txt"))
+                        .to_str()
+                        .unwrap_or("default.txt");
+                    let field_name: Vec<&str> = file_name.split('.').collect();
+                    let ext = path
+                        .extension()
+                        .unwrap_or_else(|| OsStr::new("txt"))
+                        .to_str()
+                        .unwrap_or("txt");
+                    let content = fs::read_to_string(path).await?.into_bytes();
+                    let file = File::new(field_name[0], file_name, ext, content);
+                    Ok(file)
+                } else {
+                    Err(LuaError::ExternalError(Arc::new(WebError::new(
+                        4031,
+                        format!("{} must be a file", file_path),
+                    ))))
+                }
+            } else {
+                Err(LuaError::ExternalError(Arc::new(WebError::new(
+                    4030,
+                    format!("{} Not Found", file_path),
+                ))))
+            }
+        });
+        _methods.add_async_function("download", |lua, thiss: LuaAnyUserData| async move {
+            let table = lua.create_table()?;
+            let headers = lua.create_table()?;
+            table.set("status", LuaValue::Integer(200))?;
+            let this = thiss.take::<Self>()?;
+            if this.content_type == "txt" {
+                let s = lua.create_string(&"text/plain")?;
+                headers.set("Content-Type", LuaValue::String(s))?;
+            } else if this.content_type == "html" {
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string(&"text/html")?),
+                )?;
+            } else if this.content_type == "xml" {
+                // headers.set("Content-Type", Lua.create_string("text/xml")?)?;
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string("application/xml")?),
+                )?;
+            } else if this.content_type == "gif" {
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string("image/gif")?),
+                )?;
+            } else if this.content_type == "jpeg" || this.content_type == "jpg" {
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string("image/jpeg")?),
+                )?;
+            } else if this.content_type == "png" {
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string("image/png")?),
+                )?;
+            } else if this.content_type == "xhtml" {
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string("application/xhtml+xml")?),
+                )?;
+            } else if this.content_type == "json" {
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string("application/json")?),
+                )?;
+            } else if this.content_type == "pdf" {
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string("application/pdf")?),
+                )?;
+            } else if this.content_type == "docx" {
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string("application/msword")?),
+                )?;
+            } else {
+                headers.set(
+                    "Content-Type",
+                    LuaValue::String(lua.create_string("application/octet-stream")?),
+                )?;
+            }
+            table.set("headers", headers)?;
+            table.set("body", LuaValue::UserData(thiss))?;
+            Ok(table)
+        });
     }
 }

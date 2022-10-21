@@ -182,9 +182,16 @@ impl Service<Request<Body>> for Svc {
                     }
 
                     let body = lua_resp
-                        .get::<_, Option<LuaString>>("body")
+                        .get::<_, Option<LuaValue>>("body")
                         .to_lua_err()?
-                        .map(|b| Body::from(b.as_bytes().to_vec()))
+                        .map(|b| match b {
+                            LuaValue::String(v) => Body::from(v.as_bytes().to_vec()),
+                            LuaValue::UserData(v) => {
+                                let this = v.take::<File>().unwrap();
+                                Body::from(this.content)
+                            }
+                            _ => Body::from(""),
+                        })
                         .unwrap_or_else(Body::empty);
 
                     Ok(resp.body(body).unwrap())

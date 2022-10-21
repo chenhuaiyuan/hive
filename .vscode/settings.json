@@ -7,6 +7,7 @@
     "JWTHS256",
     "Http",
     "Crypto",
-    "WebError"
+    "WebError",
+    "File"
   ]
 }
