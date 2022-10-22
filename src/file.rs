@@ -6,7 +6,7 @@ use crate::error::Error as WebError;
 use mlua::prelude::*;
 use nanoid::nanoid;
 use tokio::fs;
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub struct File {
     field_name: String,
@@ -178,8 +178,11 @@ impl LuaUserData for File {
                         .unwrap_or_else(|| OsStr::new("txt"))
                         .to_str()
                         .unwrap_or("txt");
-                    let content = fs::read_to_string(path).await?.into_bytes();
-                    let file = File::new(field_name[0], file_name, ext, content);
+
+                    let mut f = fs::File::open(path).await.to_lua_err()?;
+                    let mut buffer = Vec::new();
+                    f.read_to_end(&mut buffer).await?;
+                    let file = File::new(field_name[0], file_name, ext, buffer);
                     Ok(file)
                 } else {
                     Err(LuaError::ExternalError(Arc::new(WebError::new(
@@ -194,11 +197,11 @@ impl LuaUserData for File {
                 ))))
             }
         });
-        _methods.add_async_function("download", |lua, thiss: LuaAnyUserData| async move {
+        _methods.add_async_function("getFile", |lua, this: LuaAnyUserData| async move {
             let table = lua.create_table()?;
             let headers = lua.create_table()?;
+            let this = this.take::<Self>()?;
             table.set("status", LuaValue::Integer(200))?;
-            let this = thiss.take::<Self>()?;
             if this.content_type == "txt" {
                 let s = lua.create_string(&"text/plain")?;
                 headers.set("Content-Type", LuaValue::String(s))?;
@@ -255,7 +258,26 @@ impl LuaUserData for File {
                 )?;
             }
             table.set("headers", headers)?;
-            table.set("body", LuaValue::UserData(thiss))?;
+            table.set("body", LuaValue::String(lua.create_string(&this.content)?))?;
+            Ok(table)
+        });
+        _methods.add_async_function("download", |lua, this: LuaAnyUserData| async move {
+            let table = lua.create_table()?;
+            let headers = lua.create_table()?;
+            let this = this.take::<Self>()?;
+            table.set("status", LuaValue::Integer(200))?;
+            headers.set(
+                "Content-Type",
+                LuaValue::String(lua.create_string("application/octet-stream")?),
+            )?;
+            headers.set(
+                "Content-Disposition",
+                LuaValue::String(
+                    lua.create_string(&format!(r#"attachment; filename="{}""#, this.file_name))?,
+                ),
+            )?;
+            table.set("headers", headers)?;
+            table.set("body", LuaValue::String(lua.create_string(&this.content)?))?;
             Ok(table)
         });
     }

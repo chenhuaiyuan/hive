@@ -23,6 +23,7 @@ use hyper::service::Service;
 use hyper::{server::conn::AddrStream, Body, Request, Response, Server};
 use mlua::prelude::*;
 use multer::Multipart;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -49,15 +50,33 @@ struct LuaRequest(Request<Body>, SocketAddr);
 
 impl LuaUserData for LuaRequest {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
-        _methods.add_async_function("params", |_lua, this: LuaAnyUserData| async move {
-            let params_table = _lua.create_table()?;
+        _methods.add_async_function("params", |lua, this: LuaAnyUserData| async move {
+            let params_table = lua.create_table()?;
             let this = this.take::<Self>()?;
             if this.0.method() == Method::GET {
                 let query = this.0.uri().query().unwrap_or_default();
                 let value = serde_urlencoded::from_str::<Vec<(String, String)>>(query)
                     .map_err(WebError::parse_params)
                     .to_lua_err()?;
-                for (key, val) in value {
+
+                let mut param: HashMap<String, LuaValue> = HashMap::new();
+                for (mut key, val) in value {
+                    if key.rfind("[]").is_some() {
+                        key.pop();
+                        key.pop();
+                        let tab = param.get(&key);
+                        if let Some(LuaValue::Table(t)) = tab {
+                            t.set(t.len()? + 1, val)?;
+                        } else {
+                            let temp = lua.create_table()?;
+                            temp.set(1, val)?;
+                            param.insert(key, LuaValue::Table(temp));
+                        }
+                    } else {
+                        param.insert(key, LuaValue::String(lua.create_string(&val)?));
+                    }
+                }
+                for (key, val) in param {
                     params_table.set(key, val)?;
                 }
                 Ok(params_table)
@@ -69,7 +88,28 @@ impl LuaUserData for LuaRequest {
                 let value = serde_urlencoded::from_bytes::<Vec<(String, String)>>(&bytes)
                     .map_err(WebError::parse_params)
                     .to_lua_err()?;
-                for (key, val) in value {
+                // for (key, val) in value {
+                //     params_table.set(key, val)?;
+                // }
+
+                let mut param: HashMap<String, LuaValue> = HashMap::new();
+                for (mut key, val) in value {
+                    if key.rfind("[]").is_some() {
+                        key.pop();
+                        key.pop();
+                        let tab = param.get(&key);
+                        if let Some(LuaValue::Table(t)) = tab {
+                            t.set(t.len()? + 1, val)?;
+                        } else {
+                            let temp = lua.create_table()?;
+                            temp.set(1, val)?;
+                            param.insert(key, LuaValue::Table(temp));
+                        }
+                    } else {
+                        param.insert(key, LuaValue::String(lua.create_string(&val)?));
+                    }
+                }
+                for (key, val) in param {
                     params_table.set(key, val)?;
                 }
                 Ok(params_table)
@@ -101,6 +141,8 @@ impl LuaUserData for LuaRequest {
 
             let mut multipart = Multipart::new(this.0.into_body(), boundary.unwrap());
 
+            let mut param: HashMap<String, LuaValue> = HashMap::new();
+
             while let Some(mut field) = multipart.next_field().await.to_lua_err()? {
                 let name = field.name().map(|v| v.to_string());
 
@@ -129,10 +171,27 @@ impl LuaUserData for LuaRequest {
                         .unwrap_or_else(|| "multipart/form-data".to_string());
                     let file = File::new(field_name.clone(), file_name, content_type, field_data);
                     form_data.set(field_name, file)?;
-                } else if let Some(field_name) = name.clone() {
+                } else if let Some(mut field_name) = name.clone() {
                     let data = lua.create_string(&String::from_utf8(field_data).to_lua_err()?)?;
-                    form_data.set(field_name, data)?;
+                    if field_name.rfind("[]").is_some() {
+                        field_name.pop();
+                        field_name.pop();
+                        let tab = param.get(&field_name);
+                        if let Some(LuaValue::Table(t)) = tab {
+                            t.set(t.len()? + 1, data)?;
+                        } else {
+                            let temp = lua.create_table()?;
+                            temp.set(1, data)?;
+                            param.insert(field_name, LuaValue::Table(temp));
+                        }
+                    } else {
+                        param.insert(field_name, LuaValue::String(lua.create_string(&data)?));
+                    }
                 }
+            }
+
+            for (key, val) in param {
+                form_data.set(key, val)?;
             }
 
             Ok(form_data)
@@ -182,16 +241,9 @@ impl Service<Request<Body>> for Svc {
                     }
 
                     let body = lua_resp
-                        .get::<_, Option<LuaValue>>("body")
+                        .get::<_, Option<LuaString>>("body")
                         .to_lua_err()?
-                        .map(|b| match b {
-                            LuaValue::String(v) => Body::from(v.as_bytes().to_vec()),
-                            LuaValue::UserData(v) => {
-                                let this = v.take::<File>().unwrap();
-                                Body::from(this.content)
-                            }
-                            _ => Body::from(""),
-                        })
+                        .map(|b| Body::from(b.as_bytes().to_vec()))
                         .unwrap_or_else(Body::empty);
 
                     Ok(resp.body(body).unwrap())
@@ -259,7 +311,11 @@ fn return_err_info(err: LuaError) -> (u16, String) {
         LuaError::ExternalError(v) => {
             let s = v.as_ref().to_string();
             let r: Vec<&str> = s.split(',').collect();
-            (r[0].parse::<u16>().unwrap_or(500u16), r[1].to_string())
+            if r.len() >= 2 {
+                (r[0].parse::<u16>().unwrap_or(500u16), r[1].to_string())
+            } else {
+                (500, s)
+            }
         }
         _ => (4017, err.to_string()),
     }
