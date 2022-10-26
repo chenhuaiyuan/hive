@@ -366,6 +366,7 @@ async fn main() -> WebResult<()> {
     globals.set("Http", lua.create_proxy::<Http>()?)?;
     globals.set("Crypto", lua.create_proxy::<LuaCrypto>()?)?;
     globals.set("WebError", create_error(&lua)?)?;
+    // globals.set("DATEFORMAT", "timestamp")?;
 
     // let env = lua.create_table()?;
     // env.set("crypto", LuaCrypto)?;

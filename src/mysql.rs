@@ -1,3 +1,5 @@
+// use chrono::{TimeZone, Utc};
+use dateparser::DateTimeUtc;
 use mlua::prelude::*;
 use mysql_async::{prelude::Queryable, Opts, Pool, Row, Value as MysqlValue};
 
@@ -10,7 +12,7 @@ macro_rules! row_to_table {
             let val: Option<MysqlValue> = $row.take(key.to_string().as_str());
             let v: LuaValue;
             if let Some(val) = val {
-                v = mysql_value_to_lua_value(val, $lua);
+                v = mysql_value_to_lua_value(val, $lua)?;
             } else {
                 v = LuaValue::Nil;
             }
@@ -163,41 +165,120 @@ impl LuaUserData for MysqlPool {
     }
 }
 
-fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaValue {
+fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<LuaValue> {
     match val {
         MysqlValue::NULL => {
             let data = lua.create_string("");
             match data {
-                Ok(val) => LuaValue::String(val),
-                Err(_) => LuaValue::Nil,
+                Ok(val) => Ok(LuaValue::String(val)),
+                Err(_) => Ok(LuaValue::Nil),
             }
         }
         MysqlValue::Bytes(v) => {
             // let data = String::from_utf8(v).unwrap_or_else(|_| String::from(""));
             let data = lua.create_string(&v);
             match data {
-                Ok(val) => LuaValue::String(val),
-                Err(_) => LuaValue::Nil,
+                Ok(val) => Ok(LuaValue::String(val)),
+                Err(_) => Ok(LuaValue::Nil),
             }
         }
-        MysqlValue::Int(v) => LuaValue::Integer(v),
-        MysqlValue::UInt(v) => LuaValue::Number(v as f64),
-        MysqlValue::Float(v) => LuaValue::Number(v as f64),
-        MysqlValue::Double(v) => LuaValue::Number(v),
+        MysqlValue::Int(v) => Ok(LuaValue::Integer(v)),
+        MysqlValue::UInt(v) => Ok(LuaValue::Number(v as f64)),
+        MysqlValue::Float(v) => Ok(LuaValue::Number(v as f64)),
+        MysqlValue::Double(v) => Ok(LuaValue::Number(v)),
         MysqlValue::Date(y, m, d, h, min, s, _) => {
-            let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
-            let data = lua.create_string(&date);
-            match data {
-                Ok(val) => LuaValue::String(val),
-                Err(_) => LuaValue::Nil,
+            let format: LuaValue = lua.globals().get("DATEFORMAT")?;
+
+            match format {
+                LuaValue::Nil => {
+                    let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                    let datetime = date.parse::<DateTimeUtc>();
+                    match datetime {
+                        Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
+                        Err(_) => Ok(LuaValue::Nil),
+                    }
+                }
+                LuaValue::String(v) => {
+                    let ty = v.to_str()?;
+                    if ty == "table" {
+                        let temp = lua.create_table()?;
+                        temp.set("year", y)?;
+                        temp.set("month", m)?;
+                        temp.set("day", d)?;
+                        temp.set("hour", h)?;
+                        temp.set("min", min)?;
+                        temp.set("sec", s)?;
+                        Ok(LuaValue::Table(temp))
+                    } else if ty == "timestamp" {
+                        let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                        let datetime = date.parse::<DateTimeUtc>();
+                        match datetime {
+                            Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
+                            Err(_) => Ok(LuaValue::Nil),
+                        }
+                    } else if ty == "string" {
+                        let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                        let data = lua.create_string(&date);
+                        match data {
+                            Ok(val) => Ok(LuaValue::String(val)),
+                            Err(_) => Ok(LuaValue::Nil),
+                        }
+                    } else {
+                        let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                        let datetime = date.parse::<DateTimeUtc>();
+                        match datetime {
+                            Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
+                            Err(_) => Ok(LuaValue::Nil),
+                        }
+                    }
+                }
+                _ => {
+                    let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                    let datetime = date.parse::<DateTimeUtc>();
+                    match datetime {
+                        Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
+                        Err(_) => Ok(LuaValue::Nil),
+                    }
+                }
             }
         }
         MysqlValue::Time(_, _, h, m, s, _) => {
-            let time = format!("{:02}:{:02}:{:02}", h, m, s);
-            let data = lua.create_string(&time);
-            match data {
-                Ok(val) => LuaValue::String(val),
-                Err(_) => LuaValue::Nil,
+            let format: LuaValue = lua.globals().get("DATEFORMAT")?;
+
+            match format {
+                LuaValue::Nil => {
+                    let time = format!("{:02}:{:02}:{:02}", h, m, s);
+                    let data = lua.create_string(&time);
+                    match data {
+                        Ok(val) => Ok(LuaValue::String(val)),
+                        Err(_) => Ok(LuaValue::Nil),
+                    }
+                }
+                LuaValue::String(v) => {
+                    let s = v.to_str()?;
+                    if s == "table" {
+                        let temp = lua.create_table()?;
+                        temp.set("hour", h)?;
+                        temp.set("min", m)?;
+                        temp.set("sec", s)?;
+                        Ok(LuaValue::Table(temp))
+                    } else {
+                        let time = format!("{:02}:{:02}:{:02}", h, m, s);
+                        let data = lua.create_string(&time);
+                        match data {
+                            Ok(val) => Ok(LuaValue::String(val)),
+                            Err(_) => Ok(LuaValue::Nil),
+                        }
+                    }
+                }
+                _ => {
+                    let time = format!("{:02}:{:02}:{:02}", h, m, s);
+                    let data = lua.create_string(&time);
+                    match data {
+                        Ok(val) => Ok(LuaValue::String(val)),
+                        Err(_) => Ok(LuaValue::Nil),
+                    }
+                }
             }
         }
     }
@@ -206,13 +287,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaValue {
 fn lua_value_to_mysql_value(val: LuaValue) -> MysqlValue {
     match val {
         LuaValue::Nil => MysqlValue::NULL,
-        LuaValue::Boolean(v) => {
-            if v {
-                MysqlValue::from(1)
-            } else {
-                MysqlValue::from(0)
-            }
-        }
+        LuaValue::Boolean(v) => MysqlValue::from(v),
         LuaValue::LightUserData(_) => MysqlValue::NULL,
         LuaValue::Integer(v) => MysqlValue::Int(v),
         LuaValue::Number(v) => MysqlValue::Double(v),

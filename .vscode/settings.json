@@ -8,6 +8,10 @@
     "Http",
     "Crypto",
     "WebError",
-    "File"
+    "File",
+    "Response"
+  ],
+  "Lua.diagnostics.disable": [
+    "need-check-nil"
   ]
 }

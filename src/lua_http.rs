@@ -21,35 +21,18 @@ impl LuaUserData for Http {
             Ok(Http::new(r))
         });
         _methods.add_function(
-            "setHeader",
-            |_, (this, header): (LuaAnyUserData, LuaMultiValue)| {
-                let this = this.take::<Self>()?;
-                let header = header.into_vec();
-                let head;
-                let val;
+            "setHeaders",
+            |_, (this, headers): (LuaAnyUserData, LuaTable)| {
+                let mut this = this.take::<Self>()?;
 
-                if header.len() >= 2 {
-                    if let LuaValue::String(v) = &header[0] {
-                        head = v.to_str()?.to_string();
-                    } else {
-                        head = "".to_string();
-                    }
-                    if let LuaValue::String(v) = &header[1] {
-                        val = v.to_str()?.to_string();
-                    } else {
-                        val = "".to_string();
-                    }
-                } else {
-                    head = "".to_string();
-                    val = "".to_string();
+                for pair in headers.pairs::<LuaString, LuaString>() {
+                    let (key, value) = pair?;
+                    let head = key.to_str()?;
+                    let val = value.to_str()?;
+                    this.0 = this.0.set(head, val);
                 }
 
-                let r = if !head.is_empty() && !val.is_empty() {
-                    this.0.set(&head, &val)
-                } else {
-                    this.0
-                };
-                Ok(Http::new(r))
+                Ok(this)
             },
         );
         _methods.add_function("get", |_, url: String| {
