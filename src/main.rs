@@ -24,7 +24,7 @@ use hyper::{server::conn::AddrStream, Body, Request, Response, Server};
 use mlua::prelude::*;
 use multer::Multipart;
 use std::collections::HashMap;
-use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::Context;
@@ -60,17 +60,19 @@ impl LuaUserData for LuaRequest {
                     .to_lua_err()?;
 
                 let mut param: HashMap<String, LuaValue> = HashMap::new();
-                for (mut key, val) in value {
-                    if key.rfind("[]").is_some() {
-                        key.pop();
-                        key.pop();
-                        let tab = param.get(&key);
-                        if let Some(LuaValue::Table(t)) = tab {
-                            t.set(t.len()? + 1, val)?;
-                        } else {
-                            let temp = lua.create_table()?;
-                            temp.set(1, val)?;
-                            param.insert(key, LuaValue::Table(temp));
+                for (key, val) in value {
+                    let offset = key.find('[');
+                    if let Some(o) = offset {
+                        let k = key.get(0..o);
+                        if let Some(k) = k {
+                            let tab = param.get(k);
+                            if let Some(LuaValue::Table(t)) = tab {
+                                t.set(t.len()? + 1, val)?;
+                            } else {
+                                let temp = lua.create_table()?;
+                                temp.set(1, val)?;
+                                param.insert(k.to_owned(), LuaValue::Table(temp));
+                            }
                         }
                     } else {
                         param.insert(key, LuaValue::String(lua.create_string(&val)?));
@@ -93,17 +95,19 @@ impl LuaUserData for LuaRequest {
                 // }
 
                 let mut param: HashMap<String, LuaValue> = HashMap::new();
-                for (mut key, val) in value {
-                    if key.rfind("[]").is_some() {
-                        key.pop();
-                        key.pop();
-                        let tab = param.get(&key);
-                        if let Some(LuaValue::Table(t)) = tab {
-                            t.set(t.len()? + 1, val)?;
-                        } else {
-                            let temp = lua.create_table()?;
-                            temp.set(1, val)?;
-                            param.insert(key, LuaValue::Table(temp));
+                for (key, val) in value {
+                    let offset = key.find('[');
+                    if let Some(o) = offset {
+                        let k = key.get(0..o);
+                        if let Some(k) = k {
+                            let tab = param.get(k);
+                            if let Some(LuaValue::Table(t)) = tab {
+                                t.set(t.len()? + 1, val)?;
+                            } else {
+                                let temp = lua.create_table()?;
+                                temp.set(1, val)?;
+                                param.insert(k.to_owned(), LuaValue::Table(temp));
+                            }
                         }
                     } else {
                         param.insert(key, LuaValue::String(lua.create_string(&val)?));
@@ -171,22 +175,38 @@ impl LuaUserData for LuaRequest {
                         .unwrap_or_else(|| "multipart/form-data".to_string());
                     let file = File::new(field_name.clone(), file_name, content_type, field_data);
                     form_data.set(field_name, file)?;
-                } else if let Some(mut field_name) = name.clone() {
+                } else if let Some(field_name) = name.clone() {
                     let data = lua.create_string(&String::from_utf8(field_data).to_lua_err()?)?;
-                    if field_name.rfind("[]").is_some() {
-                        field_name.pop();
-                        field_name.pop();
-                        let tab = param.get(&field_name);
-                        if let Some(LuaValue::Table(t)) = tab {
-                            t.set(t.len()? + 1, data)?;
-                        } else {
-                            let temp = lua.create_table()?;
-                            temp.set(1, data)?;
-                            param.insert(field_name, LuaValue::Table(temp));
+                    let offset = field_name.find('[');
+                    if let Some(o) = offset {
+                        let k = field_name.get(0..o);
+                        if let Some(k) = k {
+                            let tab = param.get(k);
+                            if let Some(LuaValue::Table(t)) = tab {
+                                t.set(t.len()? + 1, data)?;
+                            } else {
+                                let temp = lua.create_table()?;
+                                temp.set(1, data)?;
+                                param.insert(k.to_owned(), LuaValue::Table(temp));
+                            }
                         }
                     } else {
                         param.insert(field_name, LuaValue::String(lua.create_string(&data)?));
                     }
+                    // if field_name.rfind("[]").is_some() {
+                    //     field_name.pop();
+                    //     field_name.pop();
+                    //     let tab = param.get(&field_name);
+                    //     if let Some(LuaValue::Table(t)) = tab {
+                    //         t.set(t.len()? + 1, data)?;
+                    //     } else {
+                    //         let temp = lua.create_table()?;
+                    //         temp.set(1, data)?;
+                    //         param.insert(field_name, LuaValue::Table(temp));
+                    //     }
+                    // } else {
+                    //     param.insert(field_name, LuaValue::String(lua.create_string(&data)?));
+                    // }
                 }
             }
 
@@ -376,8 +396,15 @@ async fn main() -> WebResult<()> {
         .expect("read file failed");
 
     let handler: LuaFunction = lua.load(&file).eval()?;
-    let localhost: String = lua.globals().get("LOCALHOST")?;
-    let addr = localhost.parse()?;
+
+    let is_ipv4: bool = globals.get("ISIPV4")?;
+    let addr = if is_ipv4 {
+        let localhost: String = globals.get("LOCALHOST")?;
+        localhost.parse()?
+    } else {
+        let port: u16 = globals.get("PORT")?;
+        SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)), port)
+    };
     println!("Listening on http://{}", addr);
     lua.set_named_registry_value("http_handler", handler)?;
     let server = Server::bind(&addr).executor(LocalExec).serve(MakeSvc(lua));
