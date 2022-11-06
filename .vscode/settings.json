@@ -1,15 +1,15 @@
 {
   "Lua.diagnostics.globals": [
-    "MysqlPool",
     "exec",
     "nanoid",
-    "tableToJsonStr",
-    "JWTHS256",
-    "Http",
-    "Crypto",
-    "WebError",
-    "File",
-    "Response"
+    "file",
+    "alipay",
+    "crypto",
+    "jwt_hS256",
+    "mysql_pool",
+    "web_error",
+    "jwt_hs256",
+    "table_to_json_str"
   ],
   "Lua.diagnostics.disable": [
     "need-check-nil"

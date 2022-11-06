@@ -4,6 +4,7 @@ use std::sync::Arc;
 use axum_core::extract::rejection::BytesRejection;
 use axum_core::response::IntoResponse;
 use axum_core::Error as AxumCoreError;
+use fast_log::error::LogError;
 use http::{header::HeaderValue, header::CONTENT_TYPE};
 use hyper::Error as HyperError;
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
@@ -19,7 +20,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub fn create_error(lua: &Lua) -> LuaResult<LuaFunction> {
     lua.create_function(|_, (code, message): (u16, String)| {
-        let err = Error::new(code, message);
+        let err = Error::new(code, message.clone());
+        log::error!("{}", message);
         Err::<(), MLuaError>(MLuaError::ExternalError(Arc::new(err)))
     })
 }
@@ -29,13 +31,13 @@ impl Error {
     where
         T: Into<String>,
     {
-        Self {
-            code,
-            message: message.into(),
-        }
+        let message = message.into();
+        log::error!("{}", message);
+        Self { code, message }
     }
 
     pub(crate) fn parse_params(error: serde_urlencoded::de::Error) -> Self {
+        log::error!("{}", error.to_string());
         Self {
             code: 3000u16,
             message: error.to_string(),
@@ -97,6 +99,12 @@ impl From<AddrParseError> for Error {
 
 impl From<AxumCoreError> for Error {
     fn from(value: AxumCoreError) -> Self {
-        Self::new(2003, value.to_string())
+        Self::new(2004, value.to_string())
+    }
+}
+
+impl From<LogError> for Error {
+    fn from(value: LogError) -> Self {
+        Self::new(2005, value.to_string())
     }
 }

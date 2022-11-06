@@ -33,15 +33,15 @@ impl File {
 
 impl LuaUserData for File {
     fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(_fields: &mut F) {
-        _fields.add_field_method_get("fieldName", |lua, this| {
+        _fields.add_field_method_get("field_name", |lua, this| {
             let field_name = lua.create_string(&this.field_name)?;
             Ok(field_name)
         });
-        _fields.add_field_method_get("fileName", |lua, this| {
+        _fields.add_field_method_get("file_name", |lua, this| {
             let file_name = lua.create_string(&this.file_name)?;
             Ok(file_name)
         });
-        _fields.add_field_method_get("contentType", |lua, this| {
+        _fields.add_field_method_get("content_type", |lua, this| {
             let content_type = lua.create_string(&this.content_type)?;
             Ok(content_type)
         });
@@ -197,7 +197,7 @@ impl LuaUserData for File {
                 ))))
             }
         });
-        _methods.add_async_function("getFile", |lua, this: LuaAnyUserData| async move {
+        _methods.add_async_function("get_file", |lua, this: LuaAnyUserData| async move {
             let table = lua.create_table()?;
             let headers = lua.create_table()?;
             let this = this.take::<Self>()?;

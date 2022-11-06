@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use super::json_value_to_lua_value;
 use jwt_simple::{
     algorithms::HS256Key,
     claims::Claims,
@@ -22,15 +23,15 @@ impl LuaUserData for HS256 {
                 duration: None,
             })
         });
-        _methods.add_method_mut("setDays", |_, this, days: u64| {
+        _methods.add_method_mut("set_days", |_, this, days: u64| {
             this.duration = Some(Duration::from_days(days));
             Ok(())
         });
-        _methods.add_method_mut("setHours", |_, this, hours: u64| {
+        _methods.add_method_mut("set_hours", |_, this, hours: u64| {
             this.duration = Some(Duration::from_hours(hours));
             Ok(())
         });
-        _methods.add_method("generateToken", |_, this, data: LuaTable| {
+        _methods.add_method("generate_token", |_, this, data: LuaTable| {
             let claims;
             let mut token_data = HashMap::new();
             for pair in data.pairs::<LuaValue, LuaValue>() {
@@ -86,36 +87,5 @@ impl LuaUserData for HS256 {
                 Err(_) => Ok((LuaValue::Boolean(false), lua.create_table()?)),
             }
         });
-    }
-}
-
-fn json_value_to_lua_value(val: JsonValue, lua: &Lua) -> LuaResult<LuaValue> {
-    match val {
-        JsonValue::Null => Ok(LuaValue::Nil),
-        JsonValue::Bool(v) => Ok(LuaValue::Boolean(v)),
-        JsonValue::Number(v) => {
-            if v.is_i64() {
-                let num = v.as_i64();
-                if let Some(num) = num {
-                    return Ok(LuaValue::Integer(num));
-                }
-            } else if v.is_u64() {
-                let num = v.as_u64();
-                if let Some(num) = num {
-                    return Ok(LuaValue::Number(num as f64));
-                }
-            } else if v.is_f64() {
-                let num = v.as_f64();
-                if let Some(num) = num {
-                    return Ok(LuaValue::Number(num));
-                }
-            }
-            return Ok(LuaValue::Integer(0));
-        }
-        JsonValue::String(v) => {
-            let s = lua.create_string(&v)?;
-            return Ok(LuaValue::String(s));
-        }
-        _ => Ok(LuaValue::Nil),
     }
 }

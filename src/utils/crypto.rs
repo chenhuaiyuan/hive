@@ -5,7 +5,7 @@ pub struct LuaCrypto;
 
 impl LuaUserData for LuaCrypto {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
-        _methods.add_function("passwordHash", |lua, password: String| {
+        _methods.add_function("password_hash", |lua, password: String| {
             let alphabet = [
                 '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
             ];
@@ -17,7 +17,7 @@ impl LuaUserData for LuaCrypto {
             Ok(pass)
         });
         _methods.add_function(
-            "verifyPassword",
+            "verify_password",
             |_, (password_hash, password): (String, String)| {
                 let old_pass = decode(password_hash).to_lua_err()?;
                 let old_pass = String::from_utf8(old_pass).to_lua_err()?;

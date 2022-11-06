@@ -1,7 +1,7 @@
 use std::{collections::HashMap, time::Duration};
 
+use super::json_value_to_lua_value;
 use mlua::prelude::*;
-use serde_json::Value as JsonValue;
 use ureq::{Request, Response};
 
 #[derive(Clone)]
@@ -21,7 +21,7 @@ impl LuaUserData for Http {
             Ok(Http::new(r))
         });
         _methods.add_function(
-            "setHeaders",
+            "set_headers",
             |_, (this, headers): (LuaAnyUserData, LuaTable)| {
                 let mut this = this.take::<Self>()?;
 
@@ -56,27 +56,36 @@ impl LuaUserData for Http {
             let req = ureq::put(&url);
             Ok(Http::new(req))
         });
-        _methods.add_function("sendJson", |_, (this, data): (LuaAnyUserData, LuaTable)| {
-            let this = this.take::<Self>()?;
-            let resp = this.0.send_json(data).to_lua_err()?;
-            Ok(LuaResponse::new(resp))
-        });
-        _methods.add_function("sendString", |_, (this, data): (LuaAnyUserData, String)| {
-            let this = this.take::<Self>()?;
-            let resp = this.0.send_string(&data).to_lua_err()?;
-            Ok(LuaResponse::new(resp))
-        });
-        _methods.add_function("sendForm", |_, (this, data): (LuaAnyUserData, LuaTable)| {
-            let this = this.take::<Self>()?;
-            let data = table_to_vec(data)?;
-            let mut form_data: Vec<(&str, &str)> = Vec::new();
-            for (key, val) in data.iter() {
-                form_data.push((key, val));
-            }
-            let form = form_data.as_slice();
-            let resp = this.0.send_form(form).to_lua_err()?;
-            Ok(LuaResponse::new(resp))
-        });
+        _methods.add_function(
+            "send_json",
+            |_, (this, data): (LuaAnyUserData, LuaTable)| {
+                let this = this.take::<Self>()?;
+                let resp = this.0.send_json(data).to_lua_err()?;
+                Ok(LuaResponse::new(resp))
+            },
+        );
+        _methods.add_function(
+            "send_string",
+            |_, (this, data): (LuaAnyUserData, String)| {
+                let this = this.take::<Self>()?;
+                let resp = this.0.send_string(&data).to_lua_err()?;
+                Ok(LuaResponse::new(resp))
+            },
+        );
+        _methods.add_function(
+            "send_form",
+            |_, (this, data): (LuaAnyUserData, LuaTable)| {
+                let this = this.take::<Self>()?;
+                let data = table_to_vec(data)?;
+                let mut form_data: Vec<(&str, &str)> = Vec::new();
+                for (key, val) in data.iter() {
+                    form_data.push((key, val));
+                }
+                let form = form_data.as_slice();
+                let resp = this.0.send_form(form).to_lua_err()?;
+                Ok(LuaResponse::new(resp))
+            },
+        );
         _methods.add_function("query", |_, (this, data): (LuaAnyUserData, LuaTable)| {
             let this = this.take::<Self>()?;
             let data = table_to_vec(data)?;
@@ -155,35 +164,4 @@ fn table_to_vec(val: LuaTable) -> LuaResult<Vec<(String, String)>> {
         }
     }
     Ok(data)
-}
-
-fn json_value_to_lua_value(val: JsonValue, lua: &Lua) -> LuaResult<LuaValue> {
-    match val {
-        JsonValue::Null => Ok(LuaValue::Nil),
-        JsonValue::Bool(v) => Ok(LuaValue::Boolean(v)),
-        JsonValue::Number(v) => {
-            if v.is_i64() {
-                let num = v.as_i64();
-                if let Some(num) = num {
-                    return Ok(LuaValue::Integer(num));
-                }
-            } else if v.is_u64() {
-                let num = v.as_u64();
-                if let Some(num) = num {
-                    return Ok(LuaValue::Number(num as f64));
-                }
-            } else if v.is_f64() {
-                let num = v.as_f64();
-                if let Some(num) = num {
-                    return Ok(LuaValue::Number(num));
-                }
-            }
-            return Ok(LuaValue::Integer(0));
-        }
-        JsonValue::String(v) => {
-            let s = lua.create_string(&v)?;
-            return Ok(LuaValue::String(s));
-        }
-        _ => Ok(LuaValue::Nil),
-    }
 }

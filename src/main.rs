@@ -1,21 +1,27 @@
-mod crypto;
 mod error;
-mod file;
-mod json;
-mod jwt_simple;
-mod lua_http;
-mod mysql;
-mod nanoid;
+#[cfg(any(
+    feature = "alipay",
+    feature = "crypto",
+    feature = "file",
+    feature = "json",
+    feature = "jwt_simple",
+    feature = "http",
+    feature = "mysql",
+    feature = "nanoid"
+))]
+mod utils;
 
-use crate::crypto::LuaCrypto;
 use crate::error::{create_error, Error as WebError, Result as WebResult};
-use crate::file::File;
-use crate::json::create_table_to_json_string;
-use crate::jwt_simple::HS256;
-use crate::lua_http::Http;
-use crate::mysql::MysqlPool;
-use crate::nanoid::create_nanoid;
+use crate::utils::{
+    alipay::create_alipay, crypto::LuaCrypto, file::File, json::create_table_to_json_string,
+    jwt_simple::HS256, lua_http::Http, mysql::MysqlPool, nanoid::create_nanoid,
+};
 use clap::Parser;
+use fast_log::{
+    config::Config,
+    consts::LogSize,
+    plugin::{file_split::RollingType, packer::ZipPacker},
+};
 use futures_util::Future;
 use http::{header, HeaderMap, Method};
 use http::{header::HeaderValue, header::CONTENT_TYPE};
@@ -81,6 +87,10 @@ impl LuaUserData for LuaRequest {
                 for (key, val) in param {
                     params_table.set(key, val)?;
                 }
+                log::info!(
+                    "params: {}",
+                    serde_json::to_string(&params_table).to_lua_err()?
+                );
                 Ok(params_table)
             } else {
                 if !has_content_type(this.0.headers(), &mime::APPLICATION_WWW_FORM_URLENCODED) {
@@ -116,10 +126,14 @@ impl LuaUserData for LuaRequest {
                 for (key, val) in param {
                     params_table.set(key, val)?;
                 }
+                log::info!(
+                    "params: {}",
+                    serde_json::to_string(&params_table).to_lua_err()?
+                );
                 Ok(params_table)
             }
         });
-        _methods.add_method("remoteAddr", |_, this, ()| Ok((this.1).to_string()));
+        _methods.add_method("remote_addr", |_, this, ()| Ok((this.1).to_string()));
         _methods.add_method("headers", |lua, this, ()| {
             let headers = lua.create_table()?;
             let headers_raw = this.0.headers();
@@ -213,7 +227,10 @@ impl LuaUserData for LuaRequest {
             for (key, val) in param {
                 form_data.set(key, val)?;
             }
-
+            log::info!(
+                "form data: {}",
+                serde_json::to_string(&form_data).to_lua_err()?
+            );
             Ok(form_data)
         });
     }
@@ -235,6 +252,12 @@ impl Service<Request<Body>> for Svc {
         let method = req.method().as_str().to_string();
         let path = req.uri().path().to_string();
         let lua_req = LuaRequest(req, self.1);
+        log::info!(
+            "Request -- remote address: {}, method: {}, uri: {}",
+            self.1,
+            method,
+            path
+        );
 
         Box::pin(async move {
             let handler: LuaFunction = lua.named_registry_value("http_handler")?;
@@ -271,6 +294,7 @@ impl Service<Request<Body>> for Svc {
                 Err(err) => {
                     println!("{:?}", err);
                     let (code, message) = return_err_info(err);
+                    log::error!("{}", message);
                     Ok(Response::builder()
                         .status(200)
                         .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
@@ -367,6 +391,13 @@ struct Args {
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> WebResult<()> {
+    fast_log::init(Config::new().console().file_split(
+        "logs/",
+        LogSize::MB(50),
+        RollingType::KeepNum(5),
+        ZipPacker {},
+    ))?;
+    log::info!("app start...");
     let args = Args::parse();
 
     // let lua = Lua::new().into_static();
@@ -378,14 +409,24 @@ async fn main() -> WebResult<()> {
 
     let globals = lua_clone.globals();
 
-    globals.set("MysqlPool", lua.create_proxy::<MysqlPool>()?)?;
-    globals.set("tableToJsonStr", create_table_to_json_string(&lua)?)?;
+    #[cfg(feature = "mysql")]
+    globals.set("mysql_pool", lua.create_proxy::<MysqlPool>()?)?;
+    #[cfg(feature = "json")]
+    globals.set("table_to_json_str", create_table_to_json_string(&lua)?)?;
+    #[cfg(feature = "nanoid")]
     globals.set("nanoid", create_nanoid(&lua)?)?;
-    globals.set("JWTHS256", lua.create_proxy::<HS256>()?)?;
-    globals.set("File", lua.create_proxy::<File>()?)?;
-    globals.set("Http", lua.create_proxy::<Http>()?)?;
-    globals.set("Crypto", lua.create_proxy::<LuaCrypto>()?)?;
-    globals.set("WebError", create_error(&lua)?)?;
+    #[cfg(feature = "jwt_simple")]
+    globals.set("jwt_hs256", lua.create_proxy::<HS256>()?)?;
+    #[cfg(feature = "file")]
+    globals.set("file", lua.create_proxy::<File>()?)?;
+    #[cfg(feature = "http")]
+    globals.set("http", lua.create_proxy::<Http>()?)?;
+    #[cfg(feature = "crypto")]
+    globals.set("crypto", lua.create_proxy::<LuaCrypto>()?)?;
+    #[cfg(feature = "alipay")]
+    globals.set("alipay", create_alipay(&lua)?)?;
+
+    globals.set("web_error", create_error(&lua)?)?;
     // globals.set("DATEFORMAT", "timestamp")?;
 
     // let env = lua.create_table()?;

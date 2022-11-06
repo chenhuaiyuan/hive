@@ -1,4 +1,3 @@
-// use chrono::{TimeZone, Utc};
 use dateparser::DateTimeUtc;
 use mlua::prelude::*;
 use mysql_async::{prelude::Queryable, Opts, Pool, Row, Value as MysqlValue};
@@ -51,7 +50,7 @@ impl LuaUserData for MysqlPool {
 
             Ok(query_data)
         });
-        _methods.add_async_method("queryFirst", |lua, this, sql: String| async move {
+        _methods.add_async_method("query_first", |lua, this, sql: String| async move {
             let mut conn = this.0.get_conn().await.to_lua_err()?;
 
             let row: Option<Row> = conn.query_first(sql).await.to_lua_err()?;
@@ -103,7 +102,7 @@ impl LuaUserData for MysqlPool {
             },
         );
         _methods.add_async_method(
-            "execFirst",
+            "exec_first",
             |lua, this, (sql, params): (String, LuaMultiValue)| async move {
                 let mut conn = this.0.get_conn().await.to_lua_err()?;
                 if params.is_empty() {
@@ -138,7 +137,7 @@ impl LuaUserData for MysqlPool {
             },
         );
         _methods.add_async_method(
-            "execDrop",
+            "exec_drop",
             |_, this, (sql, params): (String, LuaMultiValue)| async move {
                 let mut conn = this.0.get_conn().await.to_lua_err()?;
                 if params.is_empty() {

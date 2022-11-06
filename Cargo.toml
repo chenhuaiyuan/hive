@@ -5,6 +5,17 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["alipay", "crypto", "file", "json", "jwt_simple", "http", "mysql", "nanoid"]
+alipay = []
+crypto = []
+file = []
+json = []
+jwt_simple = []
+http = []
+mysql = []
+nanoid = []
+
 [dependencies]
 tokio = { version = "1.21", features = ["macros", "rt", "fs"]}
 mlua = {version = "0.8", features = ["lua54", "async", "vendored", "serialize"]}
@@ -40,3 +51,7 @@ base64 = "0.13"
 dateparser = "0.1.7"
 chrono = "0.4.22"
 
+alipay-rs = "0.3"
+
+log = { version = "0.4", features = ["std", "serde"] }
+fast_log = {version = "1.5", features = ["zip"]}
