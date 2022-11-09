@@ -15,6 +15,7 @@ jwt_simple = []
 http = []
 mysql = []
 nanoid = []
+xlsx = []
 
 [dependencies]
 tokio = { version = "1.21", features = ["macros", "rt", "fs"]}
@@ -55,3 +56,6 @@ alipay-rs = "0.3"
 
 log = { version = "0.4", features = ["std", "serde"] }
 fast_log = {version = "1.5", features = ["zip"]}
+
+
+rust_xlsxwriter = "0.12"

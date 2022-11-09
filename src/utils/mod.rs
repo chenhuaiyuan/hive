@@ -14,6 +14,8 @@ pub mod lua_http;
 pub mod mysql;
 #[cfg(feature = "nanoid")]
 pub mod nanoid;
+#[cfg(feature = "xlsx")]
+pub mod xlsxwriter;
 
 use serde_json::Map;
 
