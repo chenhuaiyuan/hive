@@ -33,6 +33,7 @@ use std::collections::HashMap;
 use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use std::pin::Pin;
 use std::rc::Rc;
+use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
@@ -71,14 +72,58 @@ impl LuaUserData for LuaRequest {
                     if let Some(o) = offset {
                         let k = key.get(0..o);
                         if let Some(k) = k {
-                            let tab = param.get(k);
-                            if let Some(LuaValue::Table(t)) = tab {
-                                t.set(t.len()? + 1, val)?;
+                            let offset = key.find('.');
+                            // 表明是对象
+                            if let Some(i) = offset {
+                                let right_offset = key.find(']');
+                                let index;
+                                if let Some(r) = right_offset {
+                                    let a = key.get((o + 1)..r).unwrap_or("1");
+                                    let temp = a.parse::<i32>().to_lua_err()?;
+                                    index = temp + 1;
+                                } else {
+                                    return Err(LuaError::ExternalError(Arc::new(WebError::new(
+                                        5031,
+                                        "The transmitted parameters are incorrect",
+                                    ))));
+                                }
+                                let (_, last) = key.split_at(i + 1);
+                                let tab = param.get(k);
+                                if let Some(LuaValue::Table(t)) = tab {
+                                    let data = t.get::<_, LuaTable>(index);
+                                    match data {
+                                        Ok(v) => v.set(last, val)?,
+                                        Err(_) => {
+                                            let temp = lua.create_table()?;
+                                            temp.set(last, val)?;
+                                            t.set(index, temp)?;
+                                        }
+                                    }
+                                } else {
+                                    let temp = lua.create_table()?;
+                                    let temp2 = lua.create_table()?;
+                                    temp2.set(last, val)?;
+                                    temp.set(index, temp2)?;
+                                    param.insert(k.to_owned(), LuaValue::Table(temp));
+                                }
                             } else {
-                                let temp = lua.create_table()?;
-                                temp.set(1, val)?;
-                                param.insert(k.to_owned(), LuaValue::Table(temp));
+                                let tab = param.get(k);
+                                if let Some(LuaValue::Table(t)) = tab {
+                                    t.set(t.len()? + 1, val)?;
+                                } else {
+                                    let temp = lua.create_table()?;
+                                    temp.set(1, val)?;
+                                    param.insert(k.to_owned(), LuaValue::Table(temp));
+                                }
                             }
+                            // let tab = param.get(k);
+                            // if let Some(LuaValue::Table(t)) = tab {
+                            //     t.set(t.len()? + 1, val)?;
+                            // } else {
+                            //     let temp = lua.create_table()?;
+                            //     temp.set(1, val)?;
+                            //     param.insert(k.to_owned(), LuaValue::Table(temp));
+                            // }
                         }
                     } else {
                         param.insert(key, LuaValue::String(lua.create_string(&val)?));
@@ -110,14 +155,58 @@ impl LuaUserData for LuaRequest {
                     if let Some(o) = offset {
                         let k = key.get(0..o);
                         if let Some(k) = k {
-                            let tab = param.get(k);
-                            if let Some(LuaValue::Table(t)) = tab {
-                                t.set(t.len()? + 1, val)?;
+                            let offset = key.find('.');
+                            // 表明是对象
+                            if let Some(i) = offset {
+                                let right_offset = key.find(']');
+                                let index;
+                                if let Some(r) = right_offset {
+                                    let a = key.get((o + 1)..r).unwrap_or("1");
+                                    let temp = a.parse::<i32>().to_lua_err()?;
+                                    index = temp + 1;
+                                } else {
+                                    return Err(LuaError::ExternalError(Arc::new(WebError::new(
+                                        5031,
+                                        "The transmitted parameters are incorrect",
+                                    ))));
+                                }
+                                let (_, last) = key.split_at(i + 1);
+                                let tab = param.get(k);
+                                if let Some(LuaValue::Table(t)) = tab {
+                                    let data = t.get::<_, LuaTable>(index);
+                                    match data {
+                                        Ok(v) => v.set(last, val)?,
+                                        Err(_) => {
+                                            let temp = lua.create_table()?;
+                                            temp.set(last, val)?;
+                                            t.set(index, temp)?;
+                                        }
+                                    }
+                                } else {
+                                    let temp = lua.create_table()?;
+                                    let temp2 = lua.create_table()?;
+                                    temp2.set(last, val)?;
+                                    temp.set(index, temp2)?;
+                                    param.insert(k.to_owned(), LuaValue::Table(temp));
+                                }
                             } else {
-                                let temp = lua.create_table()?;
-                                temp.set(1, val)?;
-                                param.insert(k.to_owned(), LuaValue::Table(temp));
+                                let tab = param.get(k);
+                                if let Some(LuaValue::Table(t)) = tab {
+                                    t.set(t.len()? + 1, val)?;
+                                } else {
+                                    let temp = lua.create_table()?;
+                                    temp.set(1, val)?;
+                                    param.insert(k.to_owned(), LuaValue::Table(temp));
+                                }
                             }
+                            // let tab = param.get(k);
+                            // if let Some(LuaValue::Table(t)) = tab {
+                            //     t.set(t.len()? + 1, val)?;
+                            // } else {
+                            //     let temp = lua.create_table()?;
+                            //     temp.set(1, val)?;
+                            //     param.insert(k.to_owned(), LuaValue::Table(temp));
+                            // }
                         }
                     } else {
                         param.insert(key, LuaValue::String(lua.create_string(&val)?));
