@@ -1,6 +1,8 @@
+use crate::error::Error as WebError;
 use dateparser::DateTimeUtc;
 use mlua::prelude::*;
 use mysql_async::{prelude::Queryable, Opts, Pool, Row, Value as MysqlValue};
+use std::sync::Arc;
 
 macro_rules! row_to_table {
     ($row:expr, $lua:ident) => {{
@@ -159,6 +161,46 @@ impl LuaUserData for MysqlPool {
 
                 conn.exec_drop(sql, new_params).await.to_lua_err()?;
                 Ok(())
+            },
+        );
+        _methods.add_async_method(
+            "exec_batch",
+            |_, this, (sql, params): (String, LuaMultiValue)| async move {
+                let mut conn = this.0.get_conn().await.to_lua_err()?;
+                if params.is_empty() {
+                    Err(LuaError::ExternalError(Arc::new(WebError::new(
+                        6011,
+                        "Parameter cannot be empty",
+                    ))))
+                } else {
+                    let params = params.into_vec();
+                    let mut new_params: Vec<Vec<MysqlValue>> = Vec::new();
+                    for v in params {
+                        if let LuaValue::Table(v) = v {
+                            let mut other_params: Vec<MysqlValue> = Vec::new();
+                            for pair in v.pairs::<LuaValue, LuaValue>() {
+                                let (_, tab) = pair?;
+                                if let LuaValue::Table(t) = tab {
+                                    for pairs in t.pairs::<LuaValue, LuaValue>() {
+                                        let (_, val) = pairs?;
+                                        other_params.push(lua_value_to_mysql_value(val));
+                                    }
+                                    new_params.push(other_params.clone());
+                                } else {
+                                    other_params.push(lua_value_to_mysql_value(tab));
+                                }
+                            }
+                            new_params.push(other_params.clone());
+                        } else {
+                            return Err(LuaError::ExternalError(Arc::new(WebError::new(
+                                6012,
+                                "Parameter error",
+                            ))));
+                        }
+                    }
+                    conn.exec_batch(sql, new_params).await.to_lua_err()?;
+                    Ok(())
+                }
             },
         )
     }
