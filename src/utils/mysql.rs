@@ -181,16 +181,19 @@ impl LuaUserData for MysqlPool {
                             for pair in v.pairs::<LuaValue, LuaValue>() {
                                 let (_, tab) = pair?;
                                 if let LuaValue::Table(t) = tab {
+                                    let mut o_params: Vec<MysqlValue> = Vec::new();
                                     for pairs in t.pairs::<LuaValue, LuaValue>() {
                                         let (_, val) = pairs?;
-                                        other_params.push(lua_value_to_mysql_value(val));
+                                        o_params.push(lua_value_to_mysql_value(val));
                                     }
-                                    new_params.push(other_params.clone());
+                                    new_params.push(o_params);
                                 } else {
                                     other_params.push(lua_value_to_mysql_value(tab));
                                 }
                             }
-                            new_params.push(other_params.clone());
+                            if !other_params.is_empty() {
+                                new_params.push(other_params);
+                            }
                         } else {
                             return Err(LuaError::ExternalError(Arc::new(WebError::new(
                                 6012,
