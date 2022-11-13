@@ -17,10 +17,24 @@ pub mod nanoid;
 #[cfg(feature = "xlsx")]
 pub mod xlsxwriter;
 
+pub mod lua_request;
+
 use serde_json::Map;
 
 use mlua::prelude::*;
 use serde_json::Value as JsonValue;
+
+pub(crate) fn lua_is_array(table: LuaTable) -> LuaResult<bool> {
+    let mut is_array = true;
+    for pair in table.pairs::<LuaValue, LuaValue>() {
+        let (key, _) = pair?;
+        if key.type_name() != "integer" {
+            is_array = false;
+            break;
+        }
+    }
+    Ok(is_array)
+}
 
 pub(crate) fn json_value_to_lua_value(val: JsonValue, lua: &Lua) -> LuaResult<LuaValue> {
     match val {
@@ -79,14 +93,7 @@ pub(crate) fn lua_value_to_json_value(val: LuaValue, _lua: &Lua) -> LuaResult<Js
             Ok(JsonValue::from(data))
         }
         LuaValue::Table(v) => {
-            let mut is_array = true;
-            for pair in v.clone().pairs::<LuaValue, LuaValue>() {
-                let (key, _) = pair?;
-                if key.type_name() != "integer" {
-                    is_array = false;
-                    break;
-                }
-            }
+            let is_array = lua_is_array(v.clone())?;
             if is_array {
                 let mut arr: Vec<JsonValue> = Vec::new();
                 for pair in v.pairs::<LuaValue, LuaValue>() {

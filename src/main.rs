@@ -14,7 +14,8 @@ mod utils;
 use crate::error::{create_error, Error as WebError, Result as WebResult};
 use crate::utils::{
     alipay::create_alipay, crypto::LuaCrypto, file::File, json::create_table_to_json_string,
-    jwt_simple::HS256, lua_http::Http, mysql::MysqlPool, nanoid::create_nanoid,
+    jwt_simple::HS256, lua_http::Http, lua_request::LuaRequest, mysql::MysqlPool,
+    nanoid::create_nanoid,
 };
 use clap::Parser;
 use fast_log::{
@@ -23,307 +24,16 @@ use fast_log::{
     plugin::{file_split::RollingType, packer::ZipPacker},
 };
 use futures_util::Future;
-use http::{header, HeaderMap, Method};
 use http::{header::HeaderValue, header::CONTENT_TYPE};
 use hyper::service::Service;
 use hyper::{server::conn::AddrStream, Body, Request, Response, Server};
 use mlua::prelude::*;
-use multer::Multipart;
-use std::collections::HashMap;
-use std::net::{IpAddr, Ipv6Addr, SocketAddr};
+use std::net::SocketAddr;
+use std::net::{IpAddr, Ipv6Addr};
 use std::pin::Pin;
 use std::rc::Rc;
-use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
-
-fn has_content_type(headers: &HeaderMap, expected_content_type: &mime::Mime) -> bool {
-    let content_type = if let Some(content_type) = headers.get(header::CONTENT_TYPE) {
-        content_type
-    } else {
-        return false;
-    };
-
-    let content_type = if let Ok(content_type) = content_type.to_str() {
-        content_type
-    } else {
-        return false;
-    };
-
-    content_type.starts_with(expected_content_type.as_ref())
-}
-
-struct LuaRequest(Request<Body>, SocketAddr);
-
-impl LuaUserData for LuaRequest {
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
-        _methods.add_async_function("params", |lua, this: LuaAnyUserData| async move {
-            let params_table = lua.create_table()?;
-            let this = this.take::<Self>()?;
-            if this.0.method() == Method::GET {
-                let query = this.0.uri().query().unwrap_or_default();
-                let value = serde_urlencoded::from_str::<Vec<(String, String)>>(query)
-                    .map_err(WebError::parse_params)
-                    .to_lua_err()?;
-
-                let mut param: HashMap<String, LuaValue> = HashMap::new();
-                for (key, val) in value {
-                    let offset = key.find('[');
-                    if let Some(o) = offset {
-                        let k = key.get(0..o);
-                        if let Some(k) = k {
-                            let offset = key.find('.');
-                            // 表明是对象
-                            if let Some(i) = offset {
-                                let right_offset = key.find(']');
-                                let index;
-                                if let Some(r) = right_offset {
-                                    let a = key.get((o + 1)..r).unwrap_or("1");
-                                    let temp = a.parse::<i32>().to_lua_err()?;
-                                    index = temp + 1;
-                                } else {
-                                    return Err(LuaError::ExternalError(Arc::new(WebError::new(
-                                        5031,
-                                        "The transmitted parameters are incorrect",
-                                    ))));
-                                }
-                                let (_, last) = key.split_at(i + 1);
-                                let tab = param.get(k);
-                                if let Some(LuaValue::Table(t)) = tab {
-                                    let data = t.get::<_, LuaTable>(index);
-                                    match data {
-                                        Ok(v) => v.set(last, val)?,
-                                        Err(_) => {
-                                            let temp = lua.create_table()?;
-                                            temp.set(last, val)?;
-                                            t.set(index, temp)?;
-                                        }
-                                    }
-                                } else {
-                                    let temp = lua.create_table()?;
-                                    let temp2 = lua.create_table()?;
-                                    temp2.set(last, val)?;
-                                    temp.set(index, temp2)?;
-                                    param.insert(k.to_owned(), LuaValue::Table(temp));
-                                }
-                            } else {
-                                let tab = param.get(k);
-                                if let Some(LuaValue::Table(t)) = tab {
-                                    t.set(t.len()? + 1, val)?;
-                                } else {
-                                    let temp = lua.create_table()?;
-                                    temp.set(1, val)?;
-                                    param.insert(k.to_owned(), LuaValue::Table(temp));
-                                }
-                            }
-                            // let tab = param.get(k);
-                            // if let Some(LuaValue::Table(t)) = tab {
-                            //     t.set(t.len()? + 1, val)?;
-                            // } else {
-                            //     let temp = lua.create_table()?;
-                            //     temp.set(1, val)?;
-                            //     param.insert(k.to_owned(), LuaValue::Table(temp));
-                            // }
-                        }
-                    } else {
-                        param.insert(key, LuaValue::String(lua.create_string(&val)?));
-                    }
-                }
-                for (key, val) in param {
-                    params_table.set(key, val)?;
-                }
-                log::info!(
-                    "params: {}",
-                    serde_json::to_string(&params_table).to_lua_err()?
-                );
-                Ok(params_table)
-            } else {
-                if !has_content_type(this.0.headers(), &mime::APPLICATION_WWW_FORM_URLENCODED) {
-                    return Ok(params_table);
-                }
-                let bytes = hyper::body::to_bytes(this.0).await.to_lua_err()?;
-                let value = serde_urlencoded::from_bytes::<Vec<(String, String)>>(&bytes)
-                    .map_err(WebError::parse_params)
-                    .to_lua_err()?;
-                // for (key, val) in value {
-                //     params_table.set(key, val)?;
-                // }
-
-                let mut param: HashMap<String, LuaValue> = HashMap::new();
-                for (key, val) in value {
-                    let offset = key.find('[');
-                    if let Some(o) = offset {
-                        let k = key.get(0..o);
-                        if let Some(k) = k {
-                            let offset = key.find('.');
-                            // 表明是对象
-                            if let Some(i) = offset {
-                                let right_offset = key.find(']');
-                                let index;
-                                if let Some(r) = right_offset {
-                                    let a = key.get((o + 1)..r).unwrap_or("1");
-                                    let temp = a.parse::<i32>().to_lua_err()?;
-                                    index = temp + 1;
-                                } else {
-                                    return Err(LuaError::ExternalError(Arc::new(WebError::new(
-                                        5031,
-                                        "The transmitted parameters are incorrect",
-                                    ))));
-                                }
-                                let (_, last) = key.split_at(i + 1);
-                                let tab = param.get(k);
-                                if let Some(LuaValue::Table(t)) = tab {
-                                    let data = t.get::<_, LuaTable>(index);
-                                    match data {
-                                        Ok(v) => v.set(last, val)?,
-                                        Err(_) => {
-                                            let temp = lua.create_table()?;
-                                            temp.set(last, val)?;
-                                            t.set(index, temp)?;
-                                        }
-                                    }
-                                } else {
-                                    let temp = lua.create_table()?;
-                                    let temp2 = lua.create_table()?;
-                                    temp2.set(last, val)?;
-                                    temp.set(index, temp2)?;
-                                    param.insert(k.to_owned(), LuaValue::Table(temp));
-                                }
-                            } else {
-                                let tab = param.get(k);
-                                if let Some(LuaValue::Table(t)) = tab {
-                                    t.set(t.len()? + 1, val)?;
-                                } else {
-                                    let temp = lua.create_table()?;
-                                    temp.set(1, val)?;
-                                    param.insert(k.to_owned(), LuaValue::Table(temp));
-                                }
-                            }
-                            // let tab = param.get(k);
-                            // if let Some(LuaValue::Table(t)) = tab {
-                            //     t.set(t.len()? + 1, val)?;
-                            // } else {
-                            //     let temp = lua.create_table()?;
-                            //     temp.set(1, val)?;
-                            //     param.insert(k.to_owned(), LuaValue::Table(temp));
-                            // }
-                        }
-                    } else {
-                        param.insert(key, LuaValue::String(lua.create_string(&val)?));
-                    }
-                }
-                for (key, val) in param {
-                    params_table.set(key, val)?;
-                }
-                log::info!(
-                    "params: {}",
-                    serde_json::to_string(&params_table).to_lua_err()?
-                );
-                Ok(params_table)
-            }
-        });
-        _methods.add_method("remote_addr", |_, this, ()| Ok((this.1).to_string()));
-        _methods.add_method("headers", |lua, this, ()| {
-            let headers = lua.create_table()?;
-            let headers_raw = this.0.headers();
-            for (key, val) in headers_raw {
-                let key = key.as_str().to_string();
-                let val = val.to_str().to_lua_err()?.to_string();
-                headers.set(key, val)?;
-            }
-            Ok(headers)
-        });
-        _methods.add_async_function("form", |lua, this: LuaAnyUserData| async move {
-            let form_data = lua.create_table()?;
-            let this = this.take::<Self>()?;
-            if !has_content_type(this.0.headers(), &mime::MULTIPART_FORM_DATA) {
-                return Ok(form_data);
-            }
-            let boundary = this
-                .0
-                .headers()
-                .get(CONTENT_TYPE)
-                .and_then(|ct| ct.to_str().ok())
-                .and_then(|ct| multer::parse_boundary(ct).ok());
-
-            let mut multipart = Multipart::new(this.0.into_body(), boundary.unwrap());
-
-            let mut param: HashMap<String, LuaValue> = HashMap::new();
-
-            while let Some(mut field) = multipart.next_field().await.to_lua_err()? {
-                let name = field.name().map(|v| v.to_string());
-
-                let file_name = field.file_name().map(|v| v.to_string());
-
-                let content_type = field.content_type().map(|v| v.to_string());
-
-                // println!(
-                //     "Name: {:?}, FileName: {:?}, Content-Type: {:?}",
-                //     name, file_name, content_type
-                // );
-
-                let mut field_data: Vec<u8> = Vec::new();
-                // let mut field_bytes_len = 0;
-                while let Some(field_chunk) = field.chunk().await.to_lua_err()? {
-                    // Do something with field chunk.
-                    // field_bytes_len += field_chunk.len();
-                    field_data.append(&mut field_chunk.to_vec())
-                    // println!("{:?}", field_chunk);
-                }
-
-                if let Some(file_name) = file_name.clone() {
-                    let field_name = name.clone().unwrap_or_else(|| "default".to_string());
-                    let content_type = content_type
-                        .clone()
-                        .unwrap_or_else(|| "multipart/form-data".to_string());
-                    let file = File::new(field_name.clone(), file_name, content_type, field_data);
-                    form_data.set(field_name, file)?;
-                } else if let Some(field_name) = name.clone() {
-                    let data = lua.create_string(&String::from_utf8(field_data).to_lua_err()?)?;
-                    let offset = field_name.find('[');
-                    if let Some(o) = offset {
-                        let k = field_name.get(0..o);
-                        if let Some(k) = k {
-                            let tab = param.get(k);
-                            if let Some(LuaValue::Table(t)) = tab {
-                                t.set(t.len()? + 1, data)?;
-                            } else {
-                                let temp = lua.create_table()?;
-                                temp.set(1, data)?;
-                                param.insert(k.to_owned(), LuaValue::Table(temp));
-                            }
-                        }
-                    } else {
-                        param.insert(field_name, LuaValue::String(lua.create_string(&data)?));
-                    }
-                    // if field_name.rfind("[]").is_some() {
-                    //     field_name.pop();
-                    //     field_name.pop();
-                    //     let tab = param.get(&field_name);
-                    //     if let Some(LuaValue::Table(t)) = tab {
-                    //         t.set(t.len()? + 1, data)?;
-                    //     } else {
-                    //         let temp = lua.create_table()?;
-                    //         temp.set(1, data)?;
-                    //         param.insert(field_name, LuaValue::Table(temp));
-                    //     }
-                    // } else {
-                    //     param.insert(field_name, LuaValue::String(lua.create_string(&data)?));
-                    // }
-                }
-            }
-
-            for (key, val) in param {
-                form_data.set(key, val)?;
-            }
-            log::info!(
-                "form data: {}",
-                serde_json::to_string(&form_data).to_lua_err()?
-            );
-            Ok(form_data)
-        });
-    }
-}
 
 struct Svc(Rc<Lua>, SocketAddr);
 
@@ -340,7 +50,7 @@ impl Service<Request<Body>> for Svc {
         let lua = self.0.clone();
         let method = req.method().as_str().to_string();
         let path = req.uri().path().to_string();
-        let lua_req = LuaRequest(req, self.1);
+        let lua_req = LuaRequest::new(req, self.1);
         log::info!(
             "Request -- remote address: {}, method: {}, uri: {}",
             self.1,
