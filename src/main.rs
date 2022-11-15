@@ -7,7 +7,8 @@ mod error;
     feature = "jwt_simple",
     feature = "http",
     feature = "mysql",
-    feature = "nanoid"
+    feature = "nanoid",
+    feature = "xlsx"
 ))]
 mod utils;
 
@@ -15,7 +16,7 @@ use crate::error::{create_error, Error as WebError, Result as WebResult};
 use crate::utils::{
     alipay::create_alipay, crypto::LuaCrypto, file::File, json::create_table_to_json_string,
     jwt_simple::HS256, lua_http::Http, lua_request::LuaRequest, mysql::MysqlPool,
-    nanoid::create_nanoid,
+    nanoid::create_nanoid, xlsxwriter,
 };
 use clap::Parser;
 use fast_log::{
@@ -224,6 +225,8 @@ async fn main() -> WebResult<()> {
     globals.set("crypto", lua.create_proxy::<LuaCrypto>()?)?;
     #[cfg(feature = "alipay")]
     globals.set("alipay", create_alipay(&lua)?)?;
+    #[cfg(feature = "xlsx")]
+    globals.set("excel_write", xlsxwriter::create_xlsx_book(&lua)?)?;
 
     globals.set("web_error", create_error(&lua)?)?;
     // globals.set("DATEFORMAT", "timestamp")?;

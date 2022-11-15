@@ -9,7 +9,8 @@
     "mysql_pool",
     "web_error",
     "jwt_hs256",
-    "table_to_json_str"
+    "table_to_json_str",
+    "excel_write",
   ],
   "Lua.diagnostics.disable": [
     "need-check-nil"
