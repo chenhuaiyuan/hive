@@ -1,4 +1,5 @@
 mod error;
+mod router;
 #[cfg(any(
     feature = "alipay",
     feature = "crypto",
@@ -13,6 +14,7 @@ mod error;
 mod utils;
 
 use crate::error::{create_error, Error as WebError, Result as WebResult};
+use crate::router::create_router;
 use crate::utils::{
     alipay::create_alipay, crypto::LuaCrypto, file::File, json::create_table_to_json_string,
     jwt_simple::HS256, lua_http::Http, lua_request::LuaRequest, mysql::MysqlPool,
@@ -229,6 +231,7 @@ async fn main() -> WebResult<()> {
     globals.set("excel_write", xlsxwriter::create_xlsx_book(&lua)?)?;
 
     globals.set("web_error", create_error(&lua)?)?;
+    globals.set("hive_router", create_router(&lua)?)?;
     // globals.set("DATEFORMAT", "timestamp")?;
 
     // let env = lua.create_table()?;

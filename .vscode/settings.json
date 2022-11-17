@@ -11,6 +11,7 @@
     "jwt_hs256",
     "table_to_json_str",
     "excel_write",
+    "hive_router"
   ],
   "Lua.diagnostics.disable": [
     "need-check-nil"
