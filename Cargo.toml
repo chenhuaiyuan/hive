@@ -59,3 +59,6 @@ fast_log = {version = "1.5", features = ["zip"]}
 
 
 rust_xlsxwriter = "0.12"
+
+mongodb = "2.3"
+bson = "2.4"
