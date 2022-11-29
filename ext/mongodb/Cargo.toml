@@ -1,0 +1,15 @@
+[package]
+name = "mongodb"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+crate-type = ['cdylib']
+
+[dependencies]
+mlua = { version = "0.8", features = ["lua54", "vendored", "module"] }
+bson = {version = "2.4", features = ["chrono-0_4"]}
+mongodb = "2.3"
+chrono = "0.4"
