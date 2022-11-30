@@ -3,7 +3,7 @@ use mlua::prelude::*;
 
 pub fn create_bson(lua: &Lua) -> LuaResult<LuaTable> {
     let table = lua.create_table()?;
-    table.set("uuid", create_uuid(lua)?)?;
+    table.set("uuid", lua.create_proxy::<BsonUuid>()?)?;
     table.set("uuid_representation", create_uuid_representation(lua)?)?;
     Ok(table)
 }
@@ -43,12 +43,9 @@ impl LuaUserData for BsonBinary {
 
 pub struct BsonUuid(Uuid);
 
-fn create_uuid(lua: &Lua) -> LuaResult<LuaFunction> {
-    lua.create_function(|_, ()| Ok(BsonUuid(Uuid::new())))
-}
-
 impl LuaUserData for BsonUuid {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
+        _methods.add_function("new", |_, ()| Ok(BsonUuid(Uuid::new())));
         _methods.add_function("from_bytes", |_, bytes: [u8; 16]| {
             Ok(BsonUuid(Uuid::from_bytes(bytes)))
         });
