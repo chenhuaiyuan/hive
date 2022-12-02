@@ -13,3 +13,5 @@ mlua = { version = "0.8", features = ["lua54", "vendored", "module", "async"] }
 bson = {version = "2.4", features = ["chrono-0_4"]}
 mongodb = "2.3"
 chrono = "0.4"
+
+hive_time = {path = "../../hive_time"}
