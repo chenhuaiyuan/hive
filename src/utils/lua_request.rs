@@ -239,7 +239,7 @@ impl LuaUserData for LuaRequest {
                 while let Some(field_chunk) = field.chunk().await.to_lua_err()? {
                     // Do something with field chunk.
                     // field_bytes_len += field_chunk.len();
-                    field_data.append(&mut field_chunk.to_vec())
+                    field_data.append(&mut field_chunk.to_vec());
                     // println!("{:?}", field_chunk);
                 }
 
@@ -247,9 +247,9 @@ impl LuaUserData for LuaRequest {
                     let field_name = name.clone().unwrap_or_else(|| "default".to_string());
                     let content_type = content_type
                         .clone()
-                        .unwrap_or_else(|| "multipart/form-data".to_string());
+                        .unwrap_or_else(|| "image/jpeg".to_string());
                     let file = File::new(field_name.clone(), file_name, content_type, field_data);
-                    form_data.set(field_name, file)?;
+                    form_data.set(field_name, lua.create_userdata(file)?)?;
                 } else if let Some(field_name) = name.clone() {
                     let data = String::from_utf8(field_data).to_lua_err()?;
                     let offset = field_name.find('[');
@@ -293,10 +293,11 @@ impl LuaUserData for LuaRequest {
             for (key, val) in param {
                 form_data.set(key, val)?;
             }
-            log::info!(
-                "form data: {}",
-                serde_json::to_string(&form_data).to_lua_err()?
-            );
+            // file没有实现序列化，所以不能使用，后期再去实现，TODO
+            // log::info!(
+            //     "form data: {}",
+            //     serde_json::to_string(&form_data).to_lua_err()?
+            // );
             Ok(form_data)
         });
     }

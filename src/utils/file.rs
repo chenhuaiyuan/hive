@@ -34,16 +34,11 @@ impl File {
 impl LuaUserData for File {
     fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(_fields: &mut F) {
         _fields.add_field_method_get("field_name", |lua, this| {
-            let field_name = lua.create_string(&this.field_name)?;
-            Ok(field_name)
+            lua.create_string(&this.field_name)
         });
-        _fields.add_field_method_get("file_name", |lua, this| {
-            let file_name = lua.create_string(&this.file_name)?;
-            Ok(file_name)
-        });
+        _fields.add_field_method_get("file_name", |lua, this| lua.create_string(&this.file_name));
         _fields.add_field_method_get("content_type", |lua, this| {
-            let content_type = lua.create_string(&this.content_type)?;
-            Ok(content_type)
+            lua.create_string(&this.content_type)
         });
     }
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
