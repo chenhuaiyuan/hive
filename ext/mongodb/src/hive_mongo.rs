@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use crate::{
     hive_mongo_client_session::MongoClientSession,
-    hive_mongo_options::{self, MongoDropCollectionOptions},
+    hive_mongo_options::{self, MongoCreateCollectionOptions, MongoDropCollectionOptions},
 };
 use mlua::prelude::*;
 use mongodb::{Client, Database, Namespace};
@@ -123,6 +123,16 @@ impl LuaUserData for MongoCollection {
                 let options = options.map(|v| v.take::<MongoDropCollectionOptions>()?.0);
                 let session = session.take::<MongoClientSession>()?;
                 this.0.drop_with.session(options, session.0).to_lua_err()?;
+                Ok(())
+            },
+        );
+        // TODO
+        // list_collection以后实现
+        _methods.add_method(
+            "create_collection",
+            |_, this, (name, options): (String, Option<LuaAnyUserData>)| {
+                let options = options.map(|v| v.take::<MongoCreateCollectionOptions>()?.0);
+                this.0.create_collection(&name, options).to_lua_err()?;
                 Ok(())
             },
         );
