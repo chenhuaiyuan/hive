@@ -1,12 +1,18 @@
+use bson::Document;
 use hive_time::TimeDuration;
 use std::collections::HashMap;
 
 use crate::{
+    hive_bson::bson_value_to_lua_value,
+    hive_document::BsonDocument,
     hive_mongo_client_session::MongoClientSession,
-    hive_mongo_options::{self, MongoCreateCollectionOptions, MongoDropCollectionOptions},
+    hive_mongo_options::{
+        self, MongoAggregateOptions, MongoCreateCollectionOptions, MongoDropCollectionOptions,
+        MongoSelectionCriteria,
+    },
 };
 use mlua::prelude::*;
-use mongodb::{Client, Database, Namespace};
+use mongodb::{event::command, Client, Database, Namespace};
 
 pub struct MongoClient(Client);
 
@@ -71,6 +77,143 @@ impl LuaUserData for MongoDatabase {
             }
         });
         _methods.add_method("collection", |lua, name: String| {});
+
+        _methods.add_async_method(
+            "close",
+            |_, this, options: Option<LuaAnyUserData>| async move {
+                if let Some(opt) = options {
+                    let options = opt.take::<MongoDropCollectionOptions>()?;
+                    this.0.drop(Some(options.0)).await?;
+                } else {
+                    this.0.drop(None).await?;
+                }
+                Ok(())
+            },
+        );
+        _methods.add_async_method(
+            "drop_with_session",
+            |_, this, (session, options): (LuaAnyUserData, Option<LuaAnyUserData>)| async move {
+                let options = options.map(|v| v.take::<MongoDropCollectionOptions>()?.0);
+                let session = session.borrow_mut::<MongoClientSession>()?.0;
+                this.0
+                    .drop_with_session(options, session)
+                    .await
+                    .to_lua_err()?;
+                Ok(())
+            },
+        );
+        // TODO
+        // list_collection以后实现
+        _methods.add_async_method(
+            "create_collection",
+            |_, this, (name, options): (String, Option<LuaAnyUserData>)| async move {
+                let options = options.map(|v| v.take::<MongoCreateCollectionOptions>()?.0);
+                this.0
+                    .create_collection(&name, options)
+                    .await
+                    .to_lua_err()?;
+                Ok(())
+            },
+        );
+        _methods.add_async_method("create_collection_with_session", |_, this, (name, options, session): (String, Option<LuaAnyUserData>, LuaAnyUserData)| async move {
+            let options = options.map(|v| v.take::<MongoCreateCollectionOptions>()?.0);
+            let session = session.borrow_mut::<MongoClientSession>()?.0;
+            this.0.create_collection_with_session(&name, options, session).await.to_lua_err();
+            Ok(())
+        });
+        _methods.add_async_method(
+            "run_command",
+            |lua, this, (command, selection_criteria): (LuaTable, Option<LuaAnyUserData>)| async move {
+                let mut doc = Document::new();
+                for pairs in v.pairs::<String, LuaValue>() {
+                    let (key, val) = pairs?;
+                    doc.insert(key, lua_value_to_bson_value(val)?)
+                }
+                let selection_criteria =
+                    selection_criteria.map(|v| v.take::<MongoSelectionCriteria>()?.0);
+                let doc = this.0.run_command(doc, selection_criteria).await.to_lua_err()?;
+                bson_value_to_lua_value(&lua, doc)
+            },
+        );
+        _methods.add_async_method(
+            "run_command_with_session",
+            |lua,
+             this,
+             (command, selection_criteria, session): (
+                LuaTable,
+                Option<LuaAnyUserData>,
+                LuaAnyUserData,
+            )| async move {
+                let mut doc = Document::new();
+                for pairs in v.pairs::<String, LuaValue>() {
+                    let (key, val) = pairs?;
+                    doc.insert(key, lua_value_to_bson_value(val)?)
+                }
+                let selection_criteria =
+                    selection_criteria.map(|v| v.take::<MongoSelectionCriteria>()?.0);
+                let session = session.borrow_mut::<MongoClientSession>()?.0;
+                let doc = this
+                    .0
+                    .run_command_with_session(doc, selection_criteria, session)
+                    .await
+                    .to_lua_err()?;
+                bson_value_to_lua_value(&lua, doc)
+            },
+        );
+        _methods.add_async_method(
+            "aggregate",
+            |lua, this, (pipeline, options): (Vec<LuaTable>, Option<LuaAnyUserData>)| async move {
+                let mut docs: Vec<Document> = Vec::new();
+                for tab in pipeline {
+                    let mut doc = Document::new();
+                    for pairs in tab.pairs::<String, LuaValue>() {
+                        let (key, val) = pairs?;
+                        doc.insert(key, lua_value_to_bson_value(val)?)
+                    }
+                    docs.push(doc);
+                }
+                let options = options.map(|v| v.take::<MongoAggregateOptions>()?.0);
+                let data = this.0.aggregate(docs, options).await.to_lua_err()?;
+                let mut resp: Vec<LuaTable> = Vec::new();
+                while let Some(doc) = data.next().await {
+                    let doc = doc.to_lua_err()?;
+                    resp.push(bson_value_to_lua_value(&lua, doc)?);
+                }
+                Ok(resp)
+            },
+        );
+        _methods.add_async_method(
+            "aggregate_with_session",
+            |lua,
+             this,
+             (pipeline, options, session): (
+                Vec<luaTable>,
+                Option<LuaAnyUserData>,
+                LuaAnyUserData,
+            )| async move {
+                let mut docs: Vec<Document> = Vec::new();
+                for tab in pipeline {
+                    let mut doc = Document::new();
+                    for pairs in tab.pairs::<String, LuaValue>() {
+                        let (key, val) = pairs?;
+                        doc.insert(key, lua_value_to_bson_value(val)?)
+                    }
+                    docs.push(doc);
+                }
+                let options = options.map(|v| v.take::<MongoAggregateOptions>()?.0);
+                let session = session.borrow_mut::<MongoClientSession>()?.0;
+                let data = this
+                    .0
+                    .aggregate_with_session(docs, options, session)
+                    .await
+                    .to_lua_err()?;
+                let mut resp: Vec<LuaTable> = Vec::new();
+                while let Some(doc) = data.next(&mut session).await.transpose()? {
+                    resp.push(bson_value_to_lua_value(&lua, doc)?);
+                }
+                Ok(resp)
+            },
+        );
     }
 }
 
@@ -108,34 +251,6 @@ impl LuaUserData for MongoCollection {
                 Ok(LuaValue::Nil)
             }
         });
-        _methods.add_method("close", |_, this, options: Option<LuaAnyUserData>| {
-            if let Some(opt) = options {
-                let options = opt.take::<MongoDropCollectionOptions>()?;
-                this.0.drop(Some(options.0))?;
-            } else {
-                this.0.drop(None)?;
-            }
-            Ok(())
-        });
-        _methods.add_method(
-            "drop_with_session",
-            |_, this, (session, options): (LuaAnyUserData, Option<LuaAnyUserData>)| {
-                let options = options.map(|v| v.take::<MongoDropCollectionOptions>()?.0);
-                let session = session.take::<MongoClientSession>()?;
-                this.0.drop_with.session(options, session.0).to_lua_err()?;
-                Ok(())
-            },
-        );
-        // TODO
-        // list_collection以后实现
-        _methods.add_method(
-            "create_collection",
-            |_, this, (name, options): (String, Option<LuaAnyUserData>)| {
-                let options = options.map(|v| v.take::<MongoCreateCollectionOptions>()?.0);
-                this.0.create_collection(&name, options).to_lua_err()?;
-                Ok(())
-            },
-        );
     }
 }
 
