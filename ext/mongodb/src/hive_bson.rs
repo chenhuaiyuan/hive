@@ -1,5 +1,5 @@
 use super::lua_is_array;
-use bson::{oid::ObjectId, Binary, Bson, DateTime, Decimal128, Document, Uuid};
+use bson::{oid::ObjectId, Binary, Bson, DateTime, Decimal128, Document, Timestamp, Uuid};
 use mlua::prelude::*;
 
 pub fn create_bson(lua: &Lua) -> LuaResult<LuaTable> {
@@ -86,15 +86,6 @@ fn create_uuid_representation(lua: &Lua) -> LuaResult<LuaTable> {
     ])
 }
 
-pub struct BsonDateTime(DateTime);
-
-// fn create_datetime(lua: &Lua) -> LuaResult<LuaAnyUserData> {}
-
-impl LuaUserData for BsonDateTime {
-    fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(_fields: &mut F) {}
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {}
-}
-
 pub struct BsonObjectId(ObjectId);
 
 impl LuaUserData for BsonObjectId {
@@ -149,6 +140,10 @@ impl LuaUserData for BsonDecimal128 {
         _methods.add_method("bytes", |_, this, ()| Ok(this.0.bytes()));
     }
 }
+
+pub struct BsonTimestamp(Timestamp);
+
+impl LuaUserData for BsonTimestamp {}
 
 pub fn bson_value_to_lua_value(lua: &Lua, bson_value: Bson) -> LuaResult<LuaValue> {
     match bson_value {

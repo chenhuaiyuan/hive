@@ -1,5 +1,6 @@
 mod hive_bson;
 mod hive_document;
+mod hive_event;
 mod hive_mongo;
 mod hive_mongo_client_session;
 mod hive_mongo_options;
