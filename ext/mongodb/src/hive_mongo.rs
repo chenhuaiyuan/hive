@@ -4,11 +4,12 @@ use std::collections::HashMap;
 
 use crate::{
     hive_bson::bson_value_to_lua_value,
-    hive_document::BsonDocument,
+    hive_document::{table_to_document, BsonDocument},
     hive_mongo_client_session::MongoClientSession,
     hive_mongo_options::{
-        self, MongoAggregateOptions, MongoCreateCollectionOptions, MongoDropCollectionOptions,
-        MongoSelectionCriteria,
+        self, MongoAggregateOptions, MongoChangeStreamOptions, MongoCountOptions,
+        MongoCreateCollectionOptions, MongoDropCollectionOptions,
+        MongoEstimatedDocumentCountOptions, MongoSelectionCriteria,
     },
 };
 use mlua::prelude::*;
@@ -79,13 +80,13 @@ impl LuaUserData for MongoDatabase {
         _methods.add_method("collection", |lua, name: String| {});
 
         _methods.add_async_method(
-            "close",
+            "drop",
             |_, this, options: Option<LuaAnyUserData>| async move {
                 if let Some(opt) = options {
                     let options = opt.take::<MongoDropCollectionOptions>()?;
-                    this.0.drop(Some(options.0)).await?;
+                    this.0.drop(Some(options.0)).await.to_lua_err()?;
                 } else {
-                    this.0.drop(None).await?;
+                    this.0.drop(None).await.to_lua_err()?;
                 }
                 Ok(())
             },
@@ -214,6 +215,51 @@ impl LuaUserData for MongoDatabase {
                 Ok(resp)
             },
         );
+        _methods.add_async_method(
+            "watch",
+            |lua, this, (pipeline, options): (Vec<LuaTable>, Option<LuaAnyUserData>)| async move {
+                let mut docs: Vec<Document> = Vec::new();
+                for tab in pipeline {
+                    let doc = table_to_document(tab)?;
+                    docs.push(doc);
+                }
+                let options = options.map(|v| v.take::<MongoChangeStreamOptions>()?.0);
+                let data = this.0.watch(docs, options).await.to_lua_err()?;
+                let resp: Vec<MongoChangeStreamEvent<Document>> = Vec::new();
+                while let Some(event) = data.next_if_any().await? {
+                    resp.push(event);
+                }
+                Ok(resp)
+            },
+        );
+        _methods.add_async_method(
+            "watch_with_session",
+            |lua,
+             this,
+             (pipeline, session, options): (
+                Vec<LuaTable>,
+                LuaAnyUserData,
+                Option<LuaAnyUserData>,
+            )| async move {
+                let mut docs: Vec<Document> = Vec::new();
+                for tab in pipeline {
+                    let doc = table_to_document(tab)?;
+                    docs.push(doc);
+                }
+                let options = options.map(|v| v.take::<MongoChangeStreamOptions>()?.0);
+                let session = session.borrow_mut::<MongoClientSession>()?.0;
+                let data = this
+                    .0
+                    .watch_with_session(docs, options, session)
+                    .await
+                    .to_lua_err()?;
+                let resp: Vec<MongoChangeStreamEvent<Document>> = Vec::new();
+                while let Some(event) = data.next(session).await? {
+                    resp.push(event);
+                }
+                Ok(resp)
+            },
+        );
     }
 }
 
@@ -251,6 +297,105 @@ impl LuaUserData for MongoCollection {
                 Ok(LuaValue::Nil)
             }
         });
+        _methods.add_async_method(
+            "drop",
+            |_, this, options: Option<LuaAnyUserData>| async move {
+                if let Some(opt) = options {
+                    let options = opt.take::<MongoDropCollectionOptions>()?;
+                    this.0.drop(Some(options.0)).await.to_lua_err()?;
+                } else {
+                    this.0.drop(None).await.to_lua_err()?;
+                }
+                Ok(())
+            },
+        );
+        _methods.add_async_method(
+            "drop_with_session",
+            |_, this, (session, options): (LuaAnyUserData, Option<LuaAnyUserData>)| async move {
+                let options = options.map(|v| v.take::<MongoDropCollectionOptions>()?.0);
+                let session = session.borrow_mut::<MongoClientSession>()?.0;
+                this.0
+                    .drop_with_session(options, session)
+                    .await
+                    .to_lua_err()?;
+                Ok(())
+            },
+        );
+        _methods.add_async_method(
+            "aggregate",
+            |lua, this, (pipeline, options): (Vec<LuaTable>, Option<LuaAnyUserData>)| async move {
+                let mut docs: Vec<Document> = Vec::new();
+                for tab in pipeline {
+                    let mut doc = Document::new();
+                    for pairs in tab.pairs::<String, LuaValue>() {
+                        let (key, val) = pairs?;
+                        doc.insert(key, lua_value_to_bson_value(val)?)
+                    }
+                    docs.push(doc);
+                }
+                let options = options.map(|v| v.take::<MongoAggregateOptions>()?.0);
+                let data = this.0.aggregate(docs, options).await.to_lua_err()?;
+                let mut resp: Vec<LuaTable> = Vec::new();
+                while let Some(doc) = data.next().await {
+                    let doc = doc.to_lua_err()?;
+                    resp.push(bson_value_to_lua_value(&lua, doc)?);
+                }
+                Ok(resp)
+            },
+        );
+        _methods.add_async_method(
+            "aggregate_with_session",
+            |lua,
+             this,
+             (pipeline, options, session): (
+                Vec<luaTable>,
+                Option<LuaAnyUserData>,
+                LuaAnyUserData,
+            )| async move {
+                let mut docs: Vec<Document> = Vec::new();
+                for tab in pipeline {
+                    let mut doc = Document::new();
+                    for pairs in tab.pairs::<String, LuaValue>() {
+                        let (key, val) = pairs?;
+                        doc.insert(key, lua_value_to_bson_value(val)?)
+                    }
+                    docs.push(doc);
+                }
+                let options = options.map(|v| v.take::<MongoAggregateOptions>()?.0);
+                let session = session.borrow_mut::<MongoClientSession>()?.0;
+                let data = this
+                    .0
+                    .aggregate_with_session(docs, options, session)
+                    .await
+                    .to_lua_err()?;
+                let mut resp: Vec<LuaTable> = Vec::new();
+                while let Some(doc) = data.next(&mut session).await.transpose()? {
+                    resp.push(bson_value_to_lua_value(&lua, doc)?);
+                }
+                Ok(resp)
+            },
+        );
+        _methods.add_async_method(
+            "estimated_document_count",
+            |_, this, options: Option<LuaAnyUserData>| async move {
+                let options = options.map(|v| v.take::<MongoEstimatedDocumentCountOptions>()?.0);
+                let data = this
+                    .0
+                    .estimated_document_count(options)
+                    .await
+                    .to_lua_err()?;
+                Ok(data)
+            },
+        );
+        _methods.add_async_method(
+            "count_documents",
+            |_, this, (filter, options): (Option<LuaTable>, Option<LuaAnyUserData>)| async move {
+                let filter = filter.map(|v| table_to_document(v)?);
+                let options = options.map(|v| v.take::<MongoCountOptions>()?.0);
+                let data = this.0.count_documents(filter, options).await.to_lua_err()?;
+                Ok(data)
+            },
+        );
     }
 }
 
