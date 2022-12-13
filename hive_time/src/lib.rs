@@ -1,7 +1,7 @@
 use mlua::prelude::*;
 use std::time::Duration;
 
-pub struct TimeDuration(Duration);
+pub struct TimeDuration(pub Duration);
 
 pub fn create_duration(lua: &Lua) -> LuaResult<LuaAnyUserData> {
     lua.create_proxy::<TimeDuration>()

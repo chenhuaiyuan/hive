@@ -1,7 +1,12 @@
-use ureq::{AgentBuilder, Proxy, RedirectAuthHeaders};
+use std::{fs::File, io::BufReader};
+
+use cookie_store::CookieStore;
+use ureq::{Agent, AgentBuilder, Proxy, RedirectAuthHeaders};
 
 use hive_time::TimeDuration;
 use mlua::prelude::*;
+
+use crate::request::ReqRequest;
 
 pub struct Req(AgentBuilder);
 
@@ -59,7 +64,7 @@ impl LuaUserData for Req {
             },
         );
         _methods.add_function(
-            "timeout",
+            "timeout_write",
             |_, (this, timeout): (LuaAnyUserData, LuaAnyUserData)| {
                 let this = this.take::<Self>()?;
                 let timeout = timeout.take::<TimeDuration>()?;
@@ -100,6 +105,21 @@ impl LuaUserData for Req {
         // todo
         // _methods.add_function("tls_config", function)
         // _methods.add_function("tls_connector", function)
+        // _methods.add_function(
+        //     "cookie_store",
+        //     |_, (this, file_name): (LuaAnyUserData, String)| {
+        //         let this = this.take::<Self>()?;
+        //         let file = File::open(file_name).to_lua_err()?;
+        //         let read = BufReader::new(file);
+        //         let store = CookieStore::load_json(read).to_lua_err()?;
+        //         Ok(Req(this.0.cookie_store(store)))
+        //     },
+        // );
+        _methods.add_function("build", |_, this: LuaAnyUserData| {
+            let this = this.take::<Self>()?;
+            let agent = this.0.build();
+            Ok(ReqAgent(agent))
+        });
     }
 }
 
@@ -127,3 +147,37 @@ pub fn create_redirect_auth_headers(lua: &Lua) -> LuaResult<LuaTable> {
 }
 
 impl LuaUserData for ReqRedirectAuthHeaders {}
+
+pub struct ReqAgent(Agent);
+
+impl LuaUserData for ReqAgent {
+    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
+        _methods.add_method("request", |_, this, (method, path): (String, String)| {
+            let req = this.0.request(&method, &path);
+            Ok(ReqRequest(req))
+        });
+        _methods.add_method("get", |_, this, path: String| {
+            Ok(ReqRequest(this.0.get(&path)))
+        });
+        _methods.add_method("head", |_, this, path: String| {
+            Ok(ReqRequest(this.0.head(&path)))
+        });
+        _methods.add_method("patch", |_, this, path: String| {
+            Ok(ReqRequest(this.0.patch(&path)))
+        });
+        _methods.add_method("post", |_, this, path: String| {
+            Ok(ReqRequest(this.0.post(&path)))
+        });
+        _methods.add_method("put", |_, this, path: String| {
+            Ok(ReqRequest(this.0.put(&path)))
+        });
+        _methods.add_method("delete", |_, this, path: String| {
+            Ok(ReqRequest(this.0.delete(&path)))
+        });
+        _methods.add_method("cookie_store", |_, this, file_name: String| {
+            let mut file = File::create(file_name).to_lua_err()?;
+            this.0.cookie_store().save_json(&mut file).to_lua_err()?;
+            Ok(())
+        });
+    }
+}

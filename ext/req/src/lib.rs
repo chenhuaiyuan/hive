@@ -1,174 +1,25 @@
-mod cookies;
 mod req;
-use std::{collections::HashMap, time::Duration};
+mod request;
+mod response;
 
 use mlua::prelude::*;
+use req::{create_proxy, create_redirect_auth_headers, create_req};
+use serde_json::Map;
 use serde_json::Value as JsonValue;
-use ureq::{Request, Response};
 
-#[derive(Clone)]
-pub struct Http(Request);
-
-impl Http {
-    pub fn new(req: Request) -> Self {
-        Self(req)
-    }
-}
-
-impl LuaUserData for Http {
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
-        _methods.add_function("timeout", |_, (this, secs): (LuaAnyUserData, u64)| {
-            let this = this.take::<Self>()?;
-            let r = this.0.timeout(Duration::from_secs(secs));
-            Ok(Http::new(r))
-        });
-        _methods.add_function(
-            "set_headers",
-            |_, (this, headers): (LuaAnyUserData, LuaTable)| {
-                let mut this = this.take::<Self>()?;
-
-                for pair in headers.pairs::<LuaString, LuaString>() {
-                    let (key, value) = pair?;
-                    let head = key.to_str()?;
-                    let val = value.to_str()?;
-                    this.0 = this.0.set(head, val);
-                }
-
-                Ok(this)
-            },
-        );
-        _methods.add_function("get", |_, url: String| {
-            println!("{}", url);
-            let req = ureq::get(&url);
-            Ok(Http::new(req))
-        });
-        _methods.add_function("post", |_, url: String| {
-            let req = ureq::post(&url);
-            Ok(Http::new(req))
-        });
-        _methods.add_function("head", |_, url: String| {
-            let req = ureq::head(&url);
-            Ok(Http::new(req))
-        });
-        _methods.add_function("patch", |_, url: String| {
-            let req = ureq::patch(&url);
-            Ok(Http::new(req))
-        });
-        _methods.add_function("put", |_, url: String| {
-            let req = ureq::put(&url);
-            Ok(Http::new(req))
-        });
-        _methods.add_function(
-            "send_json",
-            |_, (this, data): (LuaAnyUserData, LuaTable)| {
-                let this = this.take::<Self>()?;
-                let resp = this.0.send_json(data).to_lua_err()?;
-                Ok(LuaResponse::new(resp))
-            },
-        );
-        _methods.add_function(
-            "send_string",
-            |_, (this, data): (LuaAnyUserData, String)| {
-                let this = this.take::<Self>()?;
-                let resp = this.0.send_string(&data).to_lua_err()?;
-                Ok(LuaResponse::new(resp))
-            },
-        );
-        _methods.add_function(
-            "send_form",
-            |_, (this, data): (LuaAnyUserData, LuaTable)| {
-                let this = this.take::<Self>()?;
-                let data = table_to_vec(data)?;
-                let mut form_data: Vec<(&str, &str)> = Vec::new();
-                for (key, val) in data.iter() {
-                    form_data.push((key, val));
-                }
-                let form = form_data.as_slice();
-                let resp = this.0.send_form(form).to_lua_err()?;
-                Ok(LuaResponse::new(resp))
-            },
-        );
-        _methods.add_function("query", |_, (this, data): (LuaAnyUserData, LuaTable)| {
-            let this = this.take::<Self>()?;
-            let data = table_to_vec(data)?;
-            let mut req = this.0;
-            for (key, val) in data {
-                req = req.query(&key, &val);
-            }
-            let resp = req.call().to_lua_err()?;
-            Ok(LuaResponse::new(resp))
-        });
-        _methods.add_function("call", |_, this: LuaAnyUserData| {
-            let this = this.take::<Self>()?;
-            let resp = this.0.call().to_lua_err()?;
-            Ok(LuaResponse::new(resp))
-        });
-    }
-}
-
-pub struct LuaResponse(Response);
-
-impl LuaResponse {
-    pub fn new(resp: Response) -> Self {
-        Self(resp)
-    }
-}
-
-impl LuaUserData for LuaResponse {
-    fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
-        _methods.add_method("status", |_, this, ()| {
-            Ok(LuaValue::Integer(this.0.status() as i64))
-        });
-        _methods.add_function("json", |lua, this: LuaAnyUserData| {
-            let this = this.take::<Self>()?;
-            let json_data = lua.create_table()?;
-            let data: HashMap<String, serde_json::Value> = this.0.into_json().to_lua_err()?;
-            for (key, val) in data {
-                json_data.set(key, json_value_to_lua_value(val, lua)?)?;
-            }
-            Ok(json_data)
-        });
-        _methods.add_function("text", |lua, this: LuaAnyUserData| {
-            let this = this.take::<Self>()?;
-            let data = this.0.into_string().to_lua_err()?;
-            Ok(lua.create_string(&data))
-        });
-    }
-}
-
-fn table_to_vec(val: LuaTable) -> LuaResult<Vec<(String, String)>> {
-    let mut data: Vec<(String, String)> = Vec::new();
-    for pair in val.pairs::<LuaValue, LuaValue>() {
-        let (key, value) = pair?;
-        if let LuaValue::String(v) = key {
-            let k = v.to_str()?.to_string();
-
-            match value {
-                LuaValue::Boolean(v) => {
-                    if v {
-                        data.push((k, "true".to_string()));
-                    } else {
-                        data.push((k, "false".to_string()));
-                    }
-                }
-                LuaValue::Integer(v) => {
-                    data.push((k, v.to_string()));
-                }
-                LuaValue::Number(v) => {
-                    data.push((k, v.to_string()));
-                }
-                LuaValue::String(v) => {
-                    let val = v.to_str()?.to_string();
-                    data.push((k, val));
-                }
-                _ => {}
-            }
+pub(crate) fn lua_is_array(table: LuaTable) -> LuaResult<bool> {
+    let mut is_array = true;
+    for pair in table.pairs::<LuaValue, LuaValue>() {
+        let (key, _) = pair?;
+        if key.type_name() != "integer" {
+            is_array = false;
+            break;
         }
     }
-    Ok(data)
+    Ok(is_array)
 }
 
-fn json_value_to_lua_value(val: JsonValue, lua: &Lua) -> LuaResult<LuaValue> {
+pub(crate) fn json_value_to_lua_value(val: JsonValue, lua: &Lua) -> LuaResult<LuaValue> {
     match val {
         JsonValue::Null => Ok(LuaValue::Nil),
         JsonValue::Bool(v) => Ok(LuaValue::Boolean(v)),
@@ -212,4 +63,46 @@ fn json_value_to_lua_value(val: JsonValue, lua: &Lua) -> LuaResult<LuaValue> {
             return Ok(LuaValue::Table(table));
         }
     }
+}
+
+pub(crate) fn lua_value_to_json_value(val: LuaValue) -> LuaResult<JsonValue> {
+    match val {
+        LuaValue::Nil => Ok(JsonValue::Null),
+        LuaValue::Boolean(v) => Ok(JsonValue::Bool(v)),
+        LuaValue::Integer(v) => Ok(JsonValue::from(v)),
+        LuaValue::Number(v) => Ok(JsonValue::from(v)),
+        LuaValue::String(v) => {
+            let data = v.to_str()?;
+            Ok(JsonValue::from(data))
+        }
+        LuaValue::Table(v) => {
+            let is_array = lua_is_array(v.clone())?;
+            if is_array {
+                let mut arr: Vec<JsonValue> = Vec::new();
+                for pair in v.pairs::<LuaValue, LuaValue>() {
+                    let (_, val) = pair?;
+                    arr.push(lua_value_to_json_value(val)?);
+                }
+                Ok(JsonValue::from(arr))
+            } else {
+                let mut map: Map<String, JsonValue> = Map::new();
+                for pair in v.pairs::<LuaString, LuaValue>() {
+                    let (key, val) = pair?;
+                    let k = key.to_str()?;
+                    map.insert(k.to_string(), lua_value_to_json_value(val)?);
+                }
+                Ok(JsonValue::from(map))
+            }
+        }
+        _ => Ok(JsonValue::Null),
+    }
+}
+
+#[mlua::lua_module]
+fn req(lua: &Lua) -> LuaResult<LuaTable> {
+    let exports = lua.create_table()?;
+    exports.set("req", create_req(lua)?)?;
+    exports.set("proxy", create_proxy(lua)?)?;
+    exports.set("redirect_auth_headers", create_redirect_auth_headers(lua)?)?;
+    Ok(exports)
 }
