@@ -181,3 +181,45 @@ impl LuaUserData for ReqAgent {
         });
     }
 }
+
+pub fn create_delete(lua: &Lua) -> LuaResult<LuaFunction> {
+    lua.create_function(|_, path: String| {
+        let req = ureq::delete(&path);
+        Ok(ReqRequest(req))
+    })
+}
+
+pub fn create_get(lua: &Lua) -> LuaResult<LuaFunction> {
+    lua.create_function(|_, path: String| {
+        let req = ureq::get(&path);
+        Ok(ReqRequest(req))
+    })
+}
+
+pub fn create_head(lua: &Lua) -> LuaResult<LuaFunction> {
+    lua.create_function(|_, path: String| {
+        let req = ureq::head(&path);
+        Ok(ReqRequest(req))
+    })
+}
+
+pub fn create_patch(lua: &Lua) -> LuaResult<LuaFunction> {
+    lua.create_function(|_, path: String| {
+        let req = ureq::patch(&path);
+        Ok(ReqRequest(req))
+    })
+}
+
+pub fn create_post(lua: &Lua) -> LuaResult<LuaFunction> {
+    lua.create_function(|_, path: String| {
+        let req = ureq::post(&path);
+        Ok(ReqRequest(req))
+    })
+}
+
+pub fn create_put(lua: &Lua) -> LuaResult<LuaFunction> {
+    lua.create_function(|_, path: String| {
+        let req = ureq::put(&path);
+        Ok(ReqRequest(req))
+    })
+}
