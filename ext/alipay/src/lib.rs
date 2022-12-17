@@ -64,7 +64,7 @@ fn json_value_to_lua_value(val: JsonValue, lua: &Lua) -> LuaResult<LuaValue> {
     }
 }
 
-fn lua_value_to_json_value(val: LuaValue, _lua: &Lua) -> LuaResult<JsonValue> {
+fn lua_value_to_json_value(val: LuaValue) -> LuaResult<JsonValue> {
     match val {
         LuaValue::Nil => Ok(JsonValue::Null),
         LuaValue::Boolean(v) => Ok(JsonValue::Bool(v)),
@@ -80,14 +80,14 @@ fn lua_value_to_json_value(val: LuaValue, _lua: &Lua) -> LuaResult<JsonValue> {
                 let mut arr: Vec<JsonValue> = Vec::new();
                 for pair in v.pairs::<LuaValue, LuaValue>() {
                     let (_, val) = pair?;
-                    arr.push(lua_value_to_json_value(val, _lua)?);
+                    arr.push(lua_value_to_json_value(val)?);
                 }
                 Ok(JsonValue::from(arr))
             } else {
                 let mut map: Map<String, JsonValue> = Map::new();
                 for pair in v.pairs::<String, LuaValue>() {
                     let (key, val) = pair?;
-                    map.insert(key, lua_value_to_json_value(val, _lua)?);
+                    map.insert(key, lua_value_to_json_value(val)?);
                 }
                 Ok(JsonValue::from(map))
             }
@@ -96,23 +96,16 @@ fn lua_value_to_json_value(val: LuaValue, _lua: &Lua) -> LuaResult<JsonValue> {
     }
 }
 
-pub struct AlipayClient {
-    client: Client,
-}
+pub struct AlipayClient(Client);
 
-pub struct AlipayClientWithParams {
-    client: ClientWithParams,
-}
+pub struct AlipayClientWithParams(ClientWithParams);
 
 macro_rules! table_to_vec {
-    ($table: expr, $lua: ident) => {{
+    ($table: expr) => {{
         let mut data = Vec::new();
         for pair in $table.pairs::<LuaValue, LuaValue>() {
             let (key, val) = pair?;
-            data.push((
-                lua_value_to_json_value(key, $lua)?,
-                lua_value_to_json_value(val, $lua)?,
-            ));
+            data.push((lua_value_to_json_value(key)?, lua_value_to_json_value(val)?));
         }
         data
     }};
@@ -120,16 +113,43 @@ macro_rules! table_to_vec {
 
 impl LuaUserData for AlipayClient {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
+        _methods.add_function(
+            "new",
+            |_,
+             (app_id, public_key, private_key, app_cert_sn, alipay_root_cert_sn): (
+                String,
+                String,
+                String,
+                Option<String>,
+                Option<String>,
+            )| {
+                Ok(AlipayClient(Client::new(
+                    app_id,
+                    public_key,
+                    private_key,
+                    app_cert_sn,
+                    alipay_root_cert_sn,
+                )))
+            },
+        );
+        _methods.add_function(
+            "set_public_params",
+            |_, (this, params): (LuaAnyUserData, LuaTable)| {
+                let this = this.take::<Self>()?;
+                let params = table_to_vec!(params);
+                Ok(AlipayClientWithParams(this.0.set_public_params(params)))
+            },
+        );
         _methods.add_async_function(
             "post",
-            |lua, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| async move {
+            |_, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| async move {
                 let this = this.take::<Self>()?;
                 if !biz_content.is_empty() {
                     let content = biz_content.into_vec();
                     let mut params = Vec::new();
                     if content.len() == 1 {
                         if let LuaValue::Table(val) = content[0].clone() {
-                            params = table_to_vec!(val, lua);
+                            params = table_to_vec!(val);
                         } else {
                             return Err(LuaError::ExternalError(Arc::new(WebError::new(
                                 6001,
@@ -142,8 +162,8 @@ impl LuaUserData for AlipayClient {
                         if len % 2 == 0 {
                             while i < len {
                                 params.push((
-                                    lua_value_to_json_value(content[i].clone(), lua)?,
-                                    lua_value_to_json_value(content[i + 1].clone(), lua)?,
+                                    lua_value_to_json_value(content[i].clone())?,
+                                    lua_value_to_json_value(content[i + 1].clone())?,
                                 ));
                                 i += 2;
                             }
@@ -155,24 +175,12 @@ impl LuaUserData for AlipayClient {
                         }
                     }
 
-                    let data: AlipayResponse =
-                        this.client.post(method, params).await.to_lua_err()?;
+                    let data: AlipayResponse = this.0.post(method, params).await.to_lua_err()?;
                     Ok(Response(data))
                 } else {
-                    let data: AlipayResponse =
-                        this.client.no_param_post(method).await.to_lua_err()?;
+                    let data: AlipayResponse = this.0.no_param_post(method).await.to_lua_err()?;
                     Ok(Response(data))
                 }
-            },
-        );
-        _methods.add_function(
-            "set_public_params",
-            |lua, (this, params): (LuaAnyUserData, LuaTable)| {
-                let this = this.take::<Self>()?;
-                let params = table_to_vec!(params, lua);
-                Ok(AlipayClientWithParams {
-                    client: this.client.set_public_params(params),
-                })
             },
         );
     }
@@ -182,23 +190,23 @@ impl LuaUserData for AlipayClientWithParams {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
         _methods.add_function(
             "set_public_params",
-            |lua, (this, params): (LuaAnyUserData, LuaTable)| {
+            |_, (this, params): (LuaAnyUserData, LuaTable)| {
                 let mut this = this.take::<Self>()?;
-                let params = table_to_vec!(params, lua);
-                this.client.set_public_params(params);
+                let params = table_to_vec!(params);
+                this.0.set_public_params(params);
                 Ok(this)
             },
         );
         _methods.add_async_function(
             "post",
-            |lua, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| async move {
+            |_, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| async move {
                 let mut this = this.take::<Self>()?;
                 if !biz_content.is_empty() {
                     let content = biz_content.into_vec();
                     let mut params = Vec::new();
                     if content.len() == 1 {
                         if let LuaValue::Table(val) = content[0].clone() {
-                            params = table_to_vec!(val, lua);
+                            params = table_to_vec!(val);
                         } else {
                             return Err(LuaError::ExternalError(Arc::new(WebError::new(
                                 6001,
@@ -211,8 +219,8 @@ impl LuaUserData for AlipayClientWithParams {
                         if len % 2 == 0 {
                             while i < len {
                                 params.push((
-                                    lua_value_to_json_value(content[i].clone(), lua)?,
-                                    lua_value_to_json_value(content[i + 1].clone(), lua)?,
+                                    lua_value_to_json_value(content[i].clone())?,
+                                    lua_value_to_json_value(content[i + 1].clone())?,
                                 ));
                                 i += 2;
                             }
@@ -224,12 +232,10 @@ impl LuaUserData for AlipayClientWithParams {
                         }
                     }
 
-                    let data: AlipayResponse =
-                        this.client.post(method, params).await.to_lua_err()?;
+                    let data: AlipayResponse = this.0.post(method, params).await.to_lua_err()?;
                     Ok(Response(data))
                 } else {
-                    let data: AlipayResponse =
-                        this.client.no_param_post(method).await.to_lua_err()?;
+                    let data: AlipayResponse = this.0.no_param_post(method).await.to_lua_err()?;
                     Ok(Response(data))
                 }
             },
@@ -254,29 +260,6 @@ impl LuaUserData for Response {
 }
 
 #[mlua::lua_module]
-fn alipay(lua: &Lua) -> LuaResult<LuaFunction> {
-    lua.create_function(
-        |_,
-         (app_id, public_key, private_key, app_cert_sn, alipay_root_cert_sn): (
-            String,
-            String,
-            String,
-            String,
-            String,
-        )| {
-            let public_key_data = std::fs::read_to_string(public_key).to_lua_err()?;
-            let private_key_data = std::fs::read_to_string(private_key).to_lua_err()?;
-            let app_cert_sn_data = std::fs::read_to_string(app_cert_sn).to_lua_err()?;
-            let alipay_root_cert_sn_data =
-                std::fs::read_to_string(alipay_root_cert_sn).to_lua_err()?;
-            let client = Client::builder()
-                .app_id(&app_id)
-                .public_key(&public_key_data)
-                .private_key(&private_key_data)
-                .app_cert_sn(&app_cert_sn_data)
-                .alipay_root_cert_sn(&alipay_root_cert_sn_data)
-                .finish();
-            Ok(AlipayClient { client })
-        },
-    )
+fn alipay(lua: &Lua) -> LuaResult<LuaAnyUserData> {
+    lua.create_proxy::<AlipayClient>()
 }
