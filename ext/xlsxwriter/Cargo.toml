@@ -1,0 +1,25 @@
+[package]
+name = "xlsxwriter"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "xlsxwriter"
+crate-type = ['cdylib']
+
+[features]
+lua54 = ["mlua/lua54"]
+lua53 = ["mlua/lua53"]
+lua52 = ["mlua/lua52"]
+lua51 = ["mlua/lua51"]
+luajit = ["mlua/luajit"]
+vendored = ["mlua/vendored"]
+
+[dependencies]
+mlua = { version = "0.8", features = ["module"] }
+
+rust_xlsxwriter = "0.16"
+
+chrono = "0.4.22"
