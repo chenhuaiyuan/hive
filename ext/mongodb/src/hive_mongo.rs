@@ -9,11 +9,11 @@ use crate::{
     hive_mongo_options::{
         self, MongoAggregateOptions, MongoChangeStreamOptions, MongoCountOptions,
         MongoCreateCollectionOptions, MongoDropCollectionOptions,
-        MongoEstimatedDocumentCountOptions, MongoSelectionCriteria,
+        MongoEstimatedDocumentCountOptions, MongoIndexOptions, MongoSelectionCriteria,
     },
 };
 use mlua::prelude::*;
-use mongodb::{event::command, Client, Database, Namespace};
+use mongodb::{event::command, Client, Database, IndexModel, Namespace};
 
 pub struct MongoClient(Client);
 
@@ -396,9 +396,46 @@ impl LuaUserData for MongoCollection {
                 Ok(data)
             },
         );
+        _methods.add_async_method(
+            "count_documents_with_session",
+            |_,
+             this,
+             (session, filter, optionsm): (
+                LuaAnyUserData,
+                Option<LuaTable>,
+                Option<LuaAnyUserData>,
+            )| async move {
+                let filter = filter.map(|v| table_to_document(v)?);
+                let options = options.map(|v| v.take::<MongoCountOptions>()?.0);
+                let session = session.borrow_mut::<MongoClientSession>()?.0;
+                let data = this
+                    .0
+                    .count_documents_with_session(filter, options, session)
+                    .await
+                    .to_lua_err()?;
+                Ok(data)
+            },
+        );
+        // _methods.add_async_method("create_index", |_, this, (index, options): (LuaAnyUserData, Option<LuaAnyUserData>)| async move {
+        //     let index = index.take::<MongoIndexModel>()?.0;
+        //     let options = options.map(|v| v.take::<>())
+        // });
     }
 }
 
 pub struct MongoNamespace(Namespace);
 
 impl LuaUserData for MongoNamespace {}
+
+pub struct MongoIndexModel(IndexModel);
+
+pub fn create_index_model(lua: &Lua) -> LuaResult<LuaFunction> {
+    lua.create_function(|_, (keys, options): (LuaTable, Option<LuaAnyUserData>)| {
+        let keys = table_to_document(keys)?;
+        let options = options.map(|v| v.take::<MongoIndexOptions>()?.0);
+        let opt = IndexModel::builder().keys(keys).options(options).build();
+        Ok(opt)
+    })
+}
+
+impl LuaUserData for MongoIndexModel {}

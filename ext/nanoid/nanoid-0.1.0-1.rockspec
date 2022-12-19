@@ -1,4 +1,4 @@
-package = "req"
+package = "nanoid"
 version = "0.1.0-1"
 source = {
    url = "git+https://github.com/chenhuaiyuan/hive.git",
@@ -15,6 +15,6 @@ dependencies = {
 build = {
    type = "rust-mlua",
    modules = {
-      "req"
+      "nanoid"
    }
 }

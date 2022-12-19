@@ -1,11 +1,7 @@
 use std::fmt;
 use std::sync::Arc;
 
-use axum_core::extract::rejection::BytesRejection;
-use axum_core::response::IntoResponse;
-use axum_core::Error as AxumCoreError;
 use fast_log::error::LogError;
-use http::{header::HeaderValue, header::CONTENT_TYPE};
 use hyper::Error as HyperError;
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use std::net::AddrParseError;
@@ -60,28 +56,9 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-impl IntoResponse for Error {
-    fn into_response(self) -> axum_core::response::Response {
-        let resp = format!(
-            r#"{{"code": "{}", "message": "{}", "data": ""}}"#,
-            self.code, self.message
-        );
-        let mut res = resp.into_response();
-        res.headers_mut()
-            .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
-        res
-    }
-}
-
 impl From<MLuaError> for Error {
     fn from(value: MLuaError) -> Self {
         Self::new(2000, value.to_string())
-    }
-}
-
-impl From<BytesRejection> for Error {
-    fn from(value: BytesRejection) -> Self {
-        Self::new(2001, value.to_string())
     }
 }
 
@@ -94,12 +71,6 @@ impl From<HyperError> for Error {
 impl From<AddrParseError> for Error {
     fn from(value: AddrParseError) -> Self {
         Self::new(2003, value.to_string())
-    }
-}
-
-impl From<AxumCoreError> for Error {
-    fn from(value: AxumCoreError) -> Self {
-        Self::new(2004, value.to_string())
     }
 }
 

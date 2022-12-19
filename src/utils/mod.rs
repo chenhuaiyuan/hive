@@ -1,21 +1,9 @@
-#[cfg(feature = "alipay")]
-pub mod alipay;
-#[cfg(feature = "crypto")]
-pub mod crypto;
 #[cfg(feature = "file")]
 pub mod file;
 #[cfg(feature = "json")]
 pub mod json;
-#[cfg(feature = "jwt_simple")]
-pub mod jwt_simple;
-#[cfg(feature = "http")]
-pub mod lua_http;
-#[cfg(feature = "mysql")]
+
 pub mod mysql;
-#[cfg(feature = "nanoid")]
-pub mod nanoid;
-#[cfg(feature = "xlsx")]
-pub mod xlsxwriter;
 
 pub mod lua_request;
 
@@ -36,6 +24,7 @@ pub(crate) fn lua_is_array(table: LuaTable) -> LuaResult<bool> {
     Ok(is_array)
 }
 
+#[allow(dead_code)]
 pub(crate) fn json_value_to_lua_value(val: JsonValue, lua: &Lua) -> LuaResult<LuaValue> {
     match val {
         JsonValue::Null => Ok(LuaValue::Nil),
@@ -103,10 +92,9 @@ pub(crate) fn lua_value_to_json_value(val: LuaValue, _lua: &Lua) -> LuaResult<Js
                 Ok(JsonValue::from(arr))
             } else {
                 let mut map: Map<String, JsonValue> = Map::new();
-                for pair in v.pairs::<LuaString, LuaValue>() {
+                for pair in v.pairs::<String, LuaValue>() {
                     let (key, val) = pair?;
-                    let k = key.to_str()?;
-                    map.insert(k.to_string(), lua_value_to_json_value(val, _lua)?);
+                    map.insert(key, lua_value_to_json_value(val, _lua)?);
                 }
                 Ok(JsonValue::from(map))
             }

@@ -1,0 +1,28 @@
+[package]
+name = "crypto"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "crypto"
+crate-type = ['cdylib']
+
+[features]
+lua54 = ["mlua/lua54"]
+lua53 = ["mlua/lua53"]
+lua52 = ["mlua/lua52"]
+lua51 = ["mlua/lua51"]
+luajit = ["mlua/luajit"]
+vendored = ["mlua/vendored"]
+
+[dependencies]
+mlua = { version = "0.8", features = ["module"] }
+
+nanoid = "0.4.0"
+
+digest = "0.10"
+sha2 = "0.10"
+
+base64 = "0.13"

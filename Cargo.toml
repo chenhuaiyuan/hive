@@ -1,30 +1,22 @@
 [package]
 name = "hive"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["alipay", "crypto", "file", "json", "jwt_simple", "http", "mysql", "nanoid", "xlsx"]
-alipay = []
-crypto = []
+default = ["file", "json"]
 file = []
 json = []
-jwt_simple = []
-http = []
-mysql = []
-nanoid = []
-xlsx = []
 
 [dependencies]
-tokio = { version = "1.21", features = ["macros", "rt", "fs"]}
+tokio = { version = "1.23", features = ["macros", "rt", "fs", "io-util"]}
 mlua = {version = "0.8", features = ["lua54", "async", "vendored", "serialize"]}
 hyper = {version = "0.14.20", features = ["server", "http1", "tcp", "stream"]}
 http = "0.2"
 http-body = "0.4"
 futures-util = "0.3"
-axum-core = "0.2.8"
 
 serde_urlencoded = "0.7.1"
 
@@ -34,31 +26,17 @@ mime = "0.3.16"
 
 clap = {version = "4.0.11", features = ["derive"]}
 
-mysql_async = "0.31"
+multer = "2.0.4"
+
+chrono = "0.4.22"
 
 nanoid = "0.4.0"
 
-jwt-simple = "0.11.1"
-
-multer = "2.0.4"
-
-ureq = {version = "2.5.0", features = ["json", "charset"]}
-
-digest = "0.10"
-sha2 = "0.10"
-
-base64 = "0.13"
-
+mysql_async = "0.31.2"
 dateparser = "0.1.7"
-chrono = "0.4.22"
-
-alipay-rs = "0.3"
 
 log = { version = "0.4", features = ["std", "serde"] }
 fast_log = {version = "1.5", features = ["zip"]}
 
-
-rust_xlsxwriter = "0.12"
-
-mongodb = "2.3"
-bson = "2.4"
+# websocket
+# tungstenite = "0.18.0"

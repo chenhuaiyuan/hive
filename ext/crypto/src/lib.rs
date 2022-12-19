@@ -34,3 +34,8 @@ impl LuaUserData for LuaCrypto {
         );
     }
 }
+
+#[mlua::lua_module]
+fn crypto(lua: &Lua) -> LuaResult<LuaAnyUserData> {
+    lua.create_proxy::<LuaCrypto>()
+}

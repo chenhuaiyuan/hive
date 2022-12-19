@@ -4,6 +4,7 @@ use alipay_rs::{Cli, Client, ClientWithParams, MutCli, Response as AlipayRespons
 use error::Error as WebError;
 use mlua::prelude::*;
 use serde_json::{Map, Value as JsonValue};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 fn lua_is_array(table: LuaTable) -> LuaResult<bool> {
@@ -100,12 +101,12 @@ pub struct AlipayClient(Client);
 
 pub struct AlipayClientWithParams(ClientWithParams);
 
-macro_rules! table_to_vec {
+macro_rules! table_to_map {
     ($table: expr) => {{
-        let mut data = Vec::new();
-        for pair in $table.pairs::<LuaValue, LuaValue>() {
+        let mut data = HashMap::new();
+        for pair in $table.pairs::<String, LuaValue>() {
             let (key, val) = pair?;
-            data.push((lua_value_to_json_value(key)?, lua_value_to_json_value(val)?));
+            data.insert(key, lua_value_to_json_value(val)?);
         }
         data
     }};
@@ -136,7 +137,7 @@ impl LuaUserData for AlipayClient {
             "set_public_params",
             |_, (this, params): (LuaAnyUserData, LuaTable)| {
                 let this = this.take::<Self>()?;
-                let params = table_to_vec!(params);
+                let params = table_to_map!(params);
                 Ok(AlipayClientWithParams(this.0.set_public_params(params)))
             },
         );
@@ -146,10 +147,10 @@ impl LuaUserData for AlipayClient {
                 let this = this.take::<Self>()?;
                 if !biz_content.is_empty() {
                     let content = biz_content.into_vec();
-                    let mut params = Vec::new();
+                    let mut params = HashMap::new();
                     if content.len() == 1 {
                         if let LuaValue::Table(val) = content[0].clone() {
-                            params = table_to_vec!(val);
+                            params = table_to_map!(val);
                         } else {
                             return Err(LuaError::ExternalError(Arc::new(WebError::new(
                                 6001,
@@ -161,10 +162,13 @@ impl LuaUserData for AlipayClient {
                         let mut i = 0;
                         if len % 2 == 0 {
                             while i < len {
-                                params.push((
-                                    lua_value_to_json_value(content[i].clone())?,
-                                    lua_value_to_json_value(content[i + 1].clone())?,
-                                ));
+                                if let LuaValue::String(key) = content[i].clone() {
+                                    let k = key.to_str()?;
+                                    params.insert(
+                                        k.to_owned(),
+                                        lua_value_to_json_value(content[i + 1].clone())?,
+                                    );
+                                }
                                 i += 2;
                             }
                         } else {
@@ -192,7 +196,7 @@ impl LuaUserData for AlipayClientWithParams {
             "set_public_params",
             |_, (this, params): (LuaAnyUserData, LuaTable)| {
                 let mut this = this.take::<Self>()?;
-                let params = table_to_vec!(params);
+                let params = table_to_map!(params);
                 this.0.set_public_params(params);
                 Ok(this)
             },
@@ -203,10 +207,10 @@ impl LuaUserData for AlipayClientWithParams {
                 let mut this = this.take::<Self>()?;
                 if !biz_content.is_empty() {
                     let content = biz_content.into_vec();
-                    let mut params = Vec::new();
+                    let mut params = HashMap::new();
                     if content.len() == 1 {
                         if let LuaValue::Table(val) = content[0].clone() {
-                            params = table_to_vec!(val);
+                            params = table_to_map!(val);
                         } else {
                             return Err(LuaError::ExternalError(Arc::new(WebError::new(
                                 6001,
@@ -218,10 +222,13 @@ impl LuaUserData for AlipayClientWithParams {
                         let mut i = 0;
                         if len % 2 == 0 {
                             while i < len {
-                                params.push((
-                                    lua_value_to_json_value(content[i].clone())?,
-                                    lua_value_to_json_value(content[i + 1].clone())?,
-                                ));
+                                if let LuaValue::String(key) = content[i].clone() {
+                                    let k = key.to_str()?;
+                                    params.insert(
+                                        k.to_owned(),
+                                        lua_value_to_json_value(content[i + 1].clone())?,
+                                    );
+                                }
                                 i += 2;
                             }
                         } else {

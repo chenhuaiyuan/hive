@@ -1,24 +1,12 @@
 mod error;
 mod router;
-#[cfg(any(
-    feature = "alipay",
-    feature = "crypto",
-    feature = "file",
-    feature = "json",
-    feature = "jwt_simple",
-    feature = "http",
-    feature = "mysql",
-    feature = "nanoid",
-    feature = "xlsx"
-))]
+#[cfg(any(feature = "file", feature = "json"))]
 mod utils;
 
 use crate::error::{create_error, Error as WebError, Result as WebResult};
 use crate::router::create_router;
 use crate::utils::{
-    alipay::create_alipay, crypto::LuaCrypto, file::File, json::create_table_to_json_string,
-    jwt_simple::HS256, lua_http::Http, lua_request::LuaRequest, mysql::MysqlPool,
-    nanoid::create_nanoid, xlsxwriter,
+    file::File, json::create_table_to_json_string, lua_request::LuaRequest, mysql::MysqlPool,
 };
 use clap::Parser;
 use fast_log::{
@@ -207,31 +195,21 @@ async fn main() -> WebResult<()> {
     unsafe {
         lua = Rc::new(Lua::unsafe_new());
     }
-    let lua_clone = lua.clone();
 
+    let lua_clone = lua.clone();
     let globals = lua_clone.globals();
 
-    #[cfg(feature = "mysql")]
-    globals.set("mysql_pool", lua.create_proxy::<MysqlPool>()?)?;
-    #[cfg(feature = "json")]
-    globals.set("table_to_json_str", create_table_to_json_string(&lua)?)?;
-    #[cfg(feature = "nanoid")]
-    globals.set("nanoid", create_nanoid(&lua)?)?;
-    #[cfg(feature = "jwt_simple")]
-    globals.set("jwt_hs256", lua.create_proxy::<HS256>()?)?;
-    #[cfg(feature = "file")]
-    globals.set("file", lua.create_proxy::<File>()?)?;
-    #[cfg(feature = "http")]
-    globals.set("http", lua.create_proxy::<Http>()?)?;
-    #[cfg(feature = "crypto")]
-    globals.set("crypto", lua.create_proxy::<LuaCrypto>()?)?;
-    #[cfg(feature = "alipay")]
-    globals.set("alipay", create_alipay(&lua)?)?;
-    #[cfg(feature = "xlsx")]
-    globals.set("excel_write", xlsxwriter::create_xlsx_book(&lua)?)?;
+    let hive = lua.create_table()?;
 
-    globals.set("web_error", create_error(&lua)?)?;
-    globals.set("hive_router", create_router(&lua)?)?;
+    #[cfg(feature = "json")]
+    hive.set("table_to_json", create_table_to_json_string(&lua)?)?;
+    #[cfg(feature = "file")]
+    hive.set("file", lua.create_proxy::<File>()?)?;
+    hive.set("mysql_pool", lua.create_proxy::<MysqlPool>()?)?;
+
+    hive.set("web_error", create_error(&lua)?)?;
+    hive.set("router", create_router(&lua)?)?;
+    globals.set("hive", hive)?;
     // globals.set("DATEFORMAT", "timestamp")?;
 
     // let env = lua.create_table()?;

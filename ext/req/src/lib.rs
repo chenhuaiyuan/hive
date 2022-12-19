@@ -89,10 +89,9 @@ pub(crate) fn lua_value_to_json_value(val: LuaValue) -> LuaResult<JsonValue> {
                 Ok(JsonValue::from(arr))
             } else {
                 let mut map: Map<String, JsonValue> = Map::new();
-                for pair in v.pairs::<LuaString, LuaValue>() {
+                for pair in v.pairs::<String, LuaValue>() {
                     let (key, val) = pair?;
-                    let k = key.to_str()?;
-                    map.insert(k.to_string(), lua_value_to_json_value(val)?);
+                    map.insert(key, lua_value_to_json_value(val)?);
                 }
                 Ok(JsonValue::from(map))
             }

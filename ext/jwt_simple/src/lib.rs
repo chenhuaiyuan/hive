@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use super::json_value_to_lua_value;
 use jwt_simple::{
     algorithms::HS256Key,
     claims::Claims,
@@ -12,6 +11,52 @@ use serde_json::Value as JsonValue;
 pub struct HS256 {
     key: HS256Key,
     duration: Option<Duration>,
+}
+
+fn json_value_to_lua_value(val: JsonValue, lua: &Lua) -> LuaResult<LuaValue> {
+    match val {
+        JsonValue::Null => Ok(LuaValue::Nil),
+        JsonValue::Bool(v) => Ok(LuaValue::Boolean(v)),
+        JsonValue::Number(v) => {
+            if v.is_i64() {
+                let num = v.as_i64();
+                if let Some(num) = num {
+                    return Ok(LuaValue::Integer(num));
+                }
+            } else if v.is_u64() {
+                let num = v.as_u64();
+                if let Some(num) = num {
+                    return Ok(LuaValue::Number(num as f64));
+                }
+            } else if v.is_f64() {
+                let num = v.as_f64();
+                if let Some(num) = num {
+                    return Ok(LuaValue::Number(num));
+                }
+            }
+            return Ok(LuaValue::Integer(0));
+        }
+        JsonValue::String(v) => {
+            let s = lua.create_string(&v)?;
+            return Ok(LuaValue::String(s));
+        }
+        JsonValue::Array(v) => {
+            let table = lua.create_table()?;
+            let mut i = 1;
+            for val in v {
+                table.set(i, json_value_to_lua_value(val, lua)?)?;
+                i += 1;
+            }
+            return Ok(LuaValue::Table(table));
+        }
+        JsonValue::Object(v) => {
+            let table = lua.create_table()?;
+            for (key, val) in v {
+                table.set(key, json_value_to_lua_value(val, lua)?)?;
+            }
+            return Ok(LuaValue::Table(table));
+        }
+    }
 }
 
 impl LuaUserData for HS256 {
@@ -88,4 +133,9 @@ impl LuaUserData for HS256 {
             }
         });
     }
+}
+
+#[mlua::lua_module]
+fn jwt_simple(lua: &Lua) -> LuaResult<LuaAnyUserData> {
+    lua.create_proxy::<HS256>()
 }
