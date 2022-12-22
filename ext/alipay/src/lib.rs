@@ -117,10 +117,11 @@ impl LuaUserData for AlipayClient {
         _methods.add_function(
             "new",
             |_,
-             (app_id, public_key, private_key, app_cert_sn, alipay_root_cert_sn): (
+             (app_id, public_key, private_key, sandbox, app_cert_sn, alipay_root_cert_sn): (
                 String,
                 String,
                 String,
+                bool,
                 Option<String>,
                 Option<String>,
             )| {
@@ -130,6 +131,7 @@ impl LuaUserData for AlipayClient {
                     private_key,
                     app_cert_sn,
                     alipay_root_cert_sn,
+                    sandbox,
                 )))
             },
         );
@@ -184,6 +186,60 @@ impl LuaUserData for AlipayClient {
                 } else {
                     let data: AlipayResponse = this.0.no_param_post(method).await.to_lua_err()?;
                     Ok(Response(data))
+                }
+            },
+        );
+        _methods.add_function(
+            "generate_url_data",
+            |lua, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| {
+                let this = this.take::<Self>()?;
+                if !biz_content.is_empty() {
+                    let content = biz_content.into_vec();
+                    let mut params = HashMap::new();
+                    if content.len() == 1 {
+                        if let LuaValue::Table(val) = content[0].clone() {
+                            params = table_to_map!(val);
+                        } else {
+                            return Err(LuaError::ExternalError(Arc::new(WebError::new(
+                                6001,
+                                "Parameter error of Alipay post function",
+                            ))));
+                        }
+                    } else {
+                        let len = content.len();
+                        let mut i = 0;
+                        if len % 2 == 0 {
+                            while i < len {
+                                if let LuaValue::String(key) = content[i].clone() {
+                                    let k = key.to_str()?;
+                                    params.insert(
+                                        k.to_owned(),
+                                        lua_value_to_json_value(content[i + 1].clone())?,
+                                    );
+                                }
+                                i += 2;
+                            }
+                        } else {
+                            return Err(LuaError::ExternalError(Arc::new(WebError::new(
+                                6001,
+                                "Parameter error of Alipay post function",
+                            ))));
+                        }
+                    }
+
+                    let data = this.0.generate_url_data(method, params).to_lua_err()?;
+                    let params = lua.create_table()?;
+                    for (key, val) in data {
+                        params.set(key, val)?;
+                    }
+                    Ok(params)
+                } else {
+                    let data = this.0.generate_url_data(method, ()).to_lua_err()?;
+                    let params = lua.create_table()?;
+                    for (key, val) in data {
+                        params.set(key, val)?;
+                    }
+                    Ok(params)
                 }
             },
         );
@@ -246,7 +302,61 @@ impl LuaUserData for AlipayClientWithParams {
                     Ok(Response(data))
                 }
             },
-        )
+        );
+        _methods.add_function(
+            "generate_url_data",
+            |lua, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| {
+                let mut this = this.take::<Self>()?;
+                if !biz_content.is_empty() {
+                    let content = biz_content.into_vec();
+                    let mut params = HashMap::new();
+                    if content.len() == 1 {
+                        if let LuaValue::Table(val) = content[0].clone() {
+                            params = table_to_map!(val);
+                        } else {
+                            return Err(LuaError::ExternalError(Arc::new(WebError::new(
+                                6001,
+                                "Parameter error of Alipay post function",
+                            ))));
+                        }
+                    } else {
+                        let len = content.len();
+                        let mut i = 0;
+                        if len % 2 == 0 {
+                            while i < len {
+                                if let LuaValue::String(key) = content[i].clone() {
+                                    let k = key.to_str()?;
+                                    params.insert(
+                                        k.to_owned(),
+                                        lua_value_to_json_value(content[i + 1].clone())?,
+                                    );
+                                }
+                                i += 2;
+                            }
+                        } else {
+                            return Err(LuaError::ExternalError(Arc::new(WebError::new(
+                                6001,
+                                "Parameter error of Alipay post function",
+                            ))));
+                        }
+                    }
+
+                    let data = this.0.generate_url_data(method, params).to_lua_err()?;
+                    let params = lua.create_table()?;
+                    for (key, val) in data {
+                        params.set(key, val)?;
+                    }
+                    Ok(params)
+                } else {
+                    let data = this.0.generate_url_data(method, ()).to_lua_err()?;
+                    let params = lua.create_table()?;
+                    for (key, val) in data {
+                        params.set(key, val)?;
+                    }
+                    Ok(params)
+                }
+            },
+        );
     }
 }
 

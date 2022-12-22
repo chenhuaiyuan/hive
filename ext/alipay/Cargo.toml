@@ -20,6 +20,6 @@ vendored = ["mlua/vendored"]
 [dependencies]
 mlua = { version = "0.8", features = ["module", "async"] }
 
-alipay-rs = "0.3"
+alipay-rs = "0.4"
 
 serde_json = "1.0"
