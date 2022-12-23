@@ -31,7 +31,7 @@ impl LuaUserData for MysqlPool {
         _methods.add_function(
             "new",
             |_, (username, password, address): (String, String, String)| {
-                let mysql_url = format!("mysql://{}:{}@{}", username, password, address);
+                let mysql_url = format!("mysql://{username}:{password}@{address}");
                 let opts = Opts::from_url(&mysql_url).to_lua_err()?;
                 let pool = Pool::new(opts);
                 Ok(MysqlPool(pool))
@@ -235,7 +235,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
 
             match format {
                 LuaValue::Nil => {
-                    let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                    let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
                     let datetime = date.parse::<DateTimeUtc>();
                     match datetime {
                         Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
@@ -254,21 +254,21 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
                         temp.set("sec", s)?;
                         Ok(LuaValue::Table(temp))
                     } else if ty == "timestamp" {
-                        let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                        let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
                         let datetime = date.parse::<DateTimeUtc>();
                         match datetime {
                             Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
                             Err(_) => Ok(LuaValue::Nil),
                         }
                     } else if ty == "string" {
-                        let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                        let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
                         let data = lua.create_string(&date);
                         match data {
                             Ok(val) => Ok(LuaValue::String(val)),
                             Err(_) => Ok(LuaValue::Nil),
                         }
                     } else {
-                        let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                        let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
                         let datetime = date.parse::<DateTimeUtc>();
                         match datetime {
                             Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
@@ -277,7 +277,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
                     }
                 }
                 _ => {
-                    let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
+                    let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
                     let datetime = date.parse::<DateTimeUtc>();
                     match datetime {
                         Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
@@ -291,7 +291,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
 
             match format {
                 LuaValue::Nil => {
-                    let time = format!("{:02}:{:02}:{:02}", h, m, s);
+                    let time = format!("{h:02}:{m:02}:{s:02}");
                     let data = lua.create_string(&time);
                     match data {
                         Ok(val) => Ok(LuaValue::String(val)),
@@ -307,7 +307,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
                         temp.set("sec", s)?;
                         Ok(LuaValue::Table(temp))
                     } else {
-                        let time = format!("{:02}:{:02}:{:02}", h, m, s);
+                        let time = format!("{h:02}:{m:02}:{s:02}");
                         let data = lua.create_string(&time);
                         match data {
                             Ok(val) => Ok(LuaValue::String(val)),
@@ -316,7 +316,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
                     }
                 }
                 _ => {
-                    let time = format!("{:02}:{:02}:{:02}", h, m, s);
+                    let time = format!("{h:02}:{m:02}:{s:02}");
                     let data = lua.create_string(&time);
                     match data {
                         Ok(val) => Ok(LuaValue::String(val)),

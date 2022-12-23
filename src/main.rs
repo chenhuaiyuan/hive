@@ -82,15 +82,14 @@ impl Service<Request<Body>> for Svc {
                     Ok(resp.body(body).unwrap())
                 }
                 Err(err) => {
-                    println!("{:?}", err);
+                    println!("{err:?}");
                     let (code, message) = return_err_info(err);
                     log::error!("{}", message);
                     Ok(Response::builder()
                         .status(200)
                         .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
                         .body(Body::from(format!(
-                            r#"{{"code": {}, "message": "{}", "data": ""}}"#,
-                            code, message
+                            r#"{{"code": {code}, "message": "{message}", "data": ""}}"#
                         )))
                         .unwrap())
                 }
@@ -175,8 +174,12 @@ impl Service<&AddrStream> for MakeSvc {
 
 #[derive(Parser, Debug)]
 struct Args {
-    #[arg(short, long)]
+    /// 读取的文件名
+    #[arg(short, long, default_value = "index.lua")]
     file: String,
+    /// 是否开启debug模式，默认值：false
+    #[arg(short, long, default_value_t = false)]
+    debug: bool,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -189,6 +192,9 @@ async fn main() -> WebResult<()> {
     ))?;
     log::info!("app start...");
     let args = Args::parse();
+    if args.debug {
+        println!("env: debug mode");
+    }
 
     // let lua = Lua::new().into_static();
     let lua;
@@ -209,6 +215,7 @@ async fn main() -> WebResult<()> {
 
     hive.set("web_error", create_error(&lua)?)?;
     hive.set("router", create_router(&lua)?)?;
+    hive.set("env", lua.create_table_from([("debug", args.debug)])?)?;
     globals.set("hive", hive)?;
     // globals.set("DATEFORMAT", "timestamp")?;
 
@@ -229,7 +236,7 @@ async fn main() -> WebResult<()> {
         let port: u16 = globals.get("PORT")?;
         SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)), port)
     };
-    println!("Listening on http://{}", addr);
+    println!("Listening on http://{addr}");
     lua.set_named_registry_value("http_handler", handler)?;
     let server = Server::bind(&addr).executor(LocalExec).serve(MakeSvc(lua));
 

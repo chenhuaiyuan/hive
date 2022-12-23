@@ -182,13 +182,13 @@ impl LuaUserData for File {
                 } else {
                     Err(LuaError::ExternalError(Arc::new(WebError::new(
                         4031,
-                        format!("{} must be a file", file_path),
+                        format!("{file_path} must be a file"),
                     ))))
                 }
             } else {
                 Err(LuaError::ExternalError(Arc::new(WebError::new(
                     4030,
-                    format!("{} Not Found", file_path),
+                    format!("{file_path} Not Found"),
                 ))))
             }
         });
