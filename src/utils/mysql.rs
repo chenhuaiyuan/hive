@@ -69,7 +69,7 @@ impl LuaUserData for MysqlPool {
                 let mut conn = this.0.get_conn().await.to_lua_err()?;
                 if params.is_empty() {
                     let query_data = lua.create_table()?;
-                    let rows: Vec<Row> = conn.query(sql).await.to_lua_err()?;
+                    let rows: Vec<Row> = conn.exec(sql, ()).await.to_lua_err()?;
                     let mut i = 1;
                     for mut row in rows {
                         let data = row_to_table!(row, lua);
@@ -108,7 +108,7 @@ impl LuaUserData for MysqlPool {
             |lua, this, (sql, params): (String, LuaMultiValue)| async move {
                 let mut conn = this.0.get_conn().await.to_lua_err()?;
                 if params.is_empty() {
-                    let row: Option<Row> = conn.query_first(sql).await.to_lua_err()?;
+                    let row: Option<Row> = conn.exec_first(sql, ()).await.to_lua_err()?;
                     if let Some(mut row) = row {
                         let data = row_to_table!(row, lua);
                         return Ok(data);
@@ -143,7 +143,7 @@ impl LuaUserData for MysqlPool {
             |_, this, (sql, params): (String, LuaMultiValue)| async move {
                 let mut conn = this.0.get_conn().await.to_lua_err()?;
                 if params.is_empty() {
-                    conn.query_drop(sql).await.to_lua_err()?;
+                    conn.exec_drop(sql, ()).await.to_lua_err()?;
                     return Ok(());
                 }
                 let params = params.into_vec();
