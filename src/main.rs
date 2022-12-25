@@ -177,9 +177,9 @@ struct Args {
     /// 读取的文件名
     #[arg(short, long, default_value = "index.lua")]
     file: String,
-    /// 是否开启debug模式，默认值：false
+    /// 是否开启dev模式，默认值：false
     #[arg(short, long, default_value_t = false)]
-    debug: bool,
+    dev: bool,
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -192,8 +192,8 @@ async fn main() -> WebResult<()> {
     ))?;
     log::info!("app start...");
     let args = Args::parse();
-    if args.debug {
-        println!("env: debug mode");
+    if args.dev {
+        println!("env: dev mode");
     }
 
     // let lua = Lua::new().into_static();
@@ -215,7 +215,7 @@ async fn main() -> WebResult<()> {
 
     hive.set("web_error", create_error(&lua)?)?;
     hive.set("router", create_router(&lua)?)?;
-    hive.set("env", lua.create_table_from([("debug", args.debug)])?)?;
+    hive.set("env", lua.create_table_from([("dev", args.dev)])?)?;
     globals.set("hive", hive)?;
     // globals.set("DATEFORMAT", "timestamp")?;
 
