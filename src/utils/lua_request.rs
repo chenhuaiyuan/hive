@@ -218,6 +218,13 @@ impl LuaUserData for LuaRequest {
                 .and_then(|ct| ct.to_str().ok())
                 .and_then(|ct| multer::parse_boundary(ct).ok());
 
+            if boundary.is_none() {
+                return Err(LuaError::ExternalError(Arc::new(WebError::new(
+                    5041,
+                    "no multipart boundary was found",
+                ))));
+            }
+
             let mut multipart = Multipart::new(this.0.into_body(), boundary.unwrap());
 
             let mut param: HashMap<String, LuaValue> = HashMap::new();
