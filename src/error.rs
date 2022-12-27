@@ -4,6 +4,7 @@ use std::sync::Arc;
 use fast_log::error::LogError;
 use hyper::Error as HyperError;
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
+use notify::Error as NotifyError;
 use std::net::AddrParseError;
 
 #[derive(Debug)]
@@ -77,5 +78,11 @@ impl From<AddrParseError> for Error {
 impl From<LogError> for Error {
     fn from(value: LogError) -> Self {
         Self::new(2005, value.to_string())
+    }
+}
+
+impl From<NotifyError> for Error {
+    fn from(value: NotifyError) -> Self {
+        Self::new(2006, value.to_string())
     }
 }

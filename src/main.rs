@@ -1,9 +1,11 @@
 mod error;
+mod notify;
 mod router;
 #[cfg(any(feature = "file", feature = "json"))]
 mod utils;
 
 use crate::error::{create_error, Error as WebError, Result as WebResult};
+use crate::notify::async_watch;
 use crate::router::create_router;
 use crate::utils::{
     file::File, json::create_table_to_json_string, lua_request::LuaRequest, mysql::MysqlPool,
@@ -19,14 +21,18 @@ use http::{header::HeaderValue, header::CONTENT_TYPE};
 use hyper::service::Service;
 use hyper::{server::conn::AddrStream, Body, Request, Response, Server};
 use mlua::prelude::*;
+use once_cell::sync::Lazy;
+use std::fs;
 use std::net::SocketAddr;
 use std::net::{IpAddr, Ipv6Addr};
 use std::pin::Pin;
-use std::rc::Rc;
+use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
-struct Svc(Rc<Lua>, SocketAddr);
+pub static HALF_NUM_CPUS: Lazy<usize> = Lazy::new(|| 1.max(num_cpus::get() / 2));
+
+struct Svc(Arc<Lua>, SocketAddr);
 
 impl Service<Request<Body>> for Svc {
     type Response = Response<Body>;
@@ -154,7 +160,7 @@ fn return_err_info(err: LuaError) -> (u16, String) {
     }
 }
 
-struct MakeSvc(Rc<Lua>);
+struct MakeSvc(Arc<Lua>);
 
 impl Service<&AddrStream> for MakeSvc {
     type Response = Svc;
@@ -172,18 +178,20 @@ impl Service<&AddrStream> for MakeSvc {
     }
 }
 
-#[derive(Parser, Debug)]
-struct Args {
+#[derive(Parser, Debug, Clone)]
+pub struct Args {
     /// 读取的文件名
     #[arg(short, long, default_value = "index.lua")]
     file: String,
     /// 是否开启dev模式，默认值：false
     #[arg(short, long, default_value_t = false)]
     dev: bool,
+    /// 设置监视路径，默认当前路径
+    #[arg(short, long, default_value = ".")]
+    watch_dir: String,
 }
 
-#[tokio::main(flavor = "current_thread")]
-async fn main() -> WebResult<()> {
+fn main() -> WebResult<()> {
     fast_log::init(Config::new().console().file_split(
         "logs/",
         LogSize::MB(50),
@@ -199,7 +207,7 @@ async fn main() -> WebResult<()> {
     // let lua = Lua::new().into_static();
     let lua;
     unsafe {
-        lua = Rc::new(Lua::unsafe_new());
+        lua = Arc::new(Lua::unsafe_new());
     }
 
     let lua_clone = lua.clone();
@@ -222,9 +230,7 @@ async fn main() -> WebResult<()> {
     // let env = lua.create_table()?;
     // env.set("crypto", LuaCrypto)?;
 
-    let file = tokio::fs::read_to_string(args.file)
-        .await
-        .expect("read file failed");
+    let file = fs::read_to_string(args.file.clone()).expect("read file failed");
 
     let handler: LuaFunction = lua.load(&file).eval()?;
 
@@ -238,10 +244,18 @@ async fn main() -> WebResult<()> {
     };
     println!("Listening on http://{addr}");
     lua.set_named_registry_value("http_handler", handler)?;
-    let server = Server::bind(&addr).executor(LocalExec).serve(MakeSvc(lua));
+    block_on(async move {
+        let server = Server::bind(&addr)
+            .executor(LocalExec)
+            .serve(MakeSvc(lua.clone()));
 
-    let local = tokio::task::LocalSet::new();
-    local.run_until(server).await?;
+        let local = tokio::task::LocalSet::new();
+        let j = tokio::join! {
+            async_watch(lua, args.clone()),
+            local.run_until(server)
+        };
+        j.0.unwrap();
+    });
     Ok(())
 }
 
@@ -255,4 +269,13 @@ where
     fn execute(&self, fut: F) {
         tokio::task::spawn_local(fut);
     }
+}
+
+fn block_on<F: Future>(f: F) -> F::Output {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(*HALF_NUM_CPUS)
+        .build()
+        .unwrap()
+        .block_on(f)
 }
