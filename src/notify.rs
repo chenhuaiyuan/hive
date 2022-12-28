@@ -27,10 +27,8 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
     if args.dev {
         let hotfix: LuaFunction = lua
             .load(include_str!("./lua/hotfix.lua"))
-            .set_name("hive[hotfix]")
-            .unwrap()
-            .eval()
-            .unwrap();
+            .set_name("hive[hotfix]")?
+            .eval()?;
         let (mut watcher, mut rx) = async_watcher()?;
 
         // let env_file = tokio::fs::read_to_string(args.env.clone())
@@ -66,7 +64,7 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
         // }
 
         while let Some(res) = rx.recv().await {
-            let event = res.unwrap();
+            let event = res?;
             if event.kind.is_modify() {
                 for path in event.paths {
                     if path != Path::new(&args.file) {
@@ -78,7 +76,7 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
                                 let file = file.replace('/', ".");
                                 let data = file.rsplit_once('.');
                                 if let Some((mode, _)) = data {
-                                    hotfix.call::<_, ()>(mode).unwrap();
+                                    hotfix.call::<_, ()>(mode)?;
                                     lua.unset_named_registry_value("http_handler")
                                         .expect("remove registry value fail");
                                     let file = tokio::fs::read_to_string(args.file.clone())

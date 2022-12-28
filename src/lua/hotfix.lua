@@ -30,10 +30,10 @@ local function update_table(new_table, old_table)
   for key, value in pairs(new_table) do
     local old_value = old_table[key]
     local type_value = type(value)
-    if type_value == "function" then
+    if type_value == "function" and type(old_value) == "function" then
       update_func(value, old_value)
       old_table[key] = value
-    elseif type_value == "table" then
+    elseif type_value == "table" and type(old_value) == "type" then
       update_table(value, old_value)
     end
   end
@@ -47,6 +47,22 @@ local function update_table(new_table, old_table)
 end
 
 local function hotfix(filename)
+  if filename == '.git' then
+    return
+  elseif filename == 'route' then
+    local oldModule
+    if package.loaded[filename] then
+      oldModule = package.loaded[filename]
+      package.loaded[filename] = nil
+      local ok, err = pcall(require, filename)
+      if not ok then
+        package.loaded[filename] = oldModule
+        print("reload lua file failed.", err)
+        return
+      end
+    end
+    return
+  end
   print("start hotfix: ", filename)
   local oldModule
   if package.loaded[filename] then
@@ -65,11 +81,10 @@ local function hotfix(filename)
 
   local newModule = package.loaded[filename]
 
-  update_table(newModule, oldModule)
-
-  if oldModule.OnReload ~= nil then
-    oldModule:OnReload()
+  if type(newModule) == 'table' and type(oldModule) == 'table' then
+    update_table(newModule, oldModule)
   end
+
   print("replaced succeed")
   package.loaded[filename] = oldModule
 end

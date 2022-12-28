@@ -1,10 +1,12 @@
 mod error;
+mod init_object;
 mod notify;
 mod router;
 #[cfg(any(feature = "file", feature = "json"))]
 mod utils;
 
 use crate::error::{create_error, Error as WebError, Result as WebResult};
+use crate::init_object::create_object;
 use crate::notify::async_watch;
 use crate::router::create_router;
 use crate::utils::{
@@ -189,20 +191,36 @@ pub struct Args {
     /// 设置监视路径，默认当前路径
     #[arg(short, long, default_value = ".")]
     watch_dir: String,
+    /// 创建项目，举例：hive --create test
+    #[arg(long)]
+    create: Option<String>,
+    /// 热重载，此功能还未实现
+    #[arg(long, default_value_t = false)]
+    reload: bool,
 }
 
 fn main() -> WebResult<()> {
-    fast_log::init(Config::new().console().file_split(
-        "logs/",
-        LogSize::MB(50),
-        RollingType::KeepNum(5),
-        ZipPacker {},
-    ))?;
-    log::info!("app start...");
     let args = Args::parse();
     if args.dev {
-        println!("env: dev mode");
+        fast_log::init(Config::new().console().file_split(
+            "logs/",
+            LogSize::MB(50),
+            RollingType::KeepNum(5),
+            ZipPacker {},
+        ))?;
+        log::info!("env: dev mode");
+    } else if let Some(object_name) = args.create {
+        create_object(object_name)?;
+        return Ok(());
+    } else {
+        fast_log::init(Config::new().console().file_split(
+            "logs/",
+            LogSize::MB(50),
+            RollingType::KeepNum(5),
+            ZipPacker {},
+        ))?;
     }
+    log::info!("app start...");
 
     // let lua = Lua::new().into_static();
     let lua;
@@ -234,21 +252,22 @@ fn main() -> WebResult<()> {
 
     let handler: LuaFunction = lua.load(&file).eval()?;
 
-    let is_ipv4: bool = globals.get("ISIPV4")?;
+    let is_ipv4: bool = globals.get("ISIPV4").unwrap_or(true);
     let addr = if is_ipv4 {
-        let localhost: String = globals.get("LOCALHOST")?;
+        let localhost: String = globals
+            .get("LOCALHOST")
+            .unwrap_or("127.0.0.1:3000".to_owned());
         localhost.parse()?
     } else {
-        let port: u16 = globals.get("PORT")?;
+        let port: u16 = globals.get("PORT").unwrap_or(3000);
         SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)), port)
     };
     println!("Listening on http://{addr}");
     lua.set_named_registry_value("http_handler", handler)?;
-    block_on(async move {
+    block_on(async {
         let server = Server::bind(&addr)
             .executor(LocalExec)
             .serve(MakeSvc(lua.clone()));
-
         let local = tokio::task::LocalSet::new();
         let j = tokio::join! {
             async_watch(lua, args.clone()),

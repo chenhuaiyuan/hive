@@ -1,11 +1,15 @@
 use std::fmt;
 use std::sync::Arc;
 
+use downloader::Error as DownloaderError;
 use fast_log::error::LogError;
 use hyper::Error as HyperError;
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use notify::Error as NotifyError;
+use std::io::Error as IoError;
 use std::net::AddrParseError;
+use std::path::StripPrefixError;
+use zip::result::ZipError;
 
 #[derive(Debug)]
 pub struct Error {
@@ -84,5 +88,29 @@ impl From<LogError> for Error {
 impl From<NotifyError> for Error {
     fn from(value: NotifyError) -> Self {
         Self::new(2006, value.to_string())
+    }
+}
+
+impl From<DownloaderError> for Error {
+    fn from(value: DownloaderError) -> Self {
+        Self::new(2007, value.to_string())
+    }
+}
+
+impl From<ZipError> for Error {
+    fn from(value: ZipError) -> Self {
+        Self::new(2007, value.to_string())
+    }
+}
+
+impl From<IoError> for Error {
+    fn from(value: IoError) -> Self {
+        Self::new(2007, value.to_string())
+    }
+}
+
+impl From<StripPrefixError> for Error {
+    fn from(value: StripPrefixError) -> Self {
+        Self::new(2007, value.to_string())
     }
 }
