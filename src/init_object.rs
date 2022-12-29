@@ -5,6 +5,14 @@ use std::io::copy;
 use std::path::Path;
 
 pub fn create_object(name: String) -> Result<()> {
+    let mut current_dir = env::current_dir()?;
+    current_dir = current_dir.join(name.clone());
+    if current_dir.exists() {
+        println!("当前目录已存在{name}项目");
+        return Ok(());
+    } else {
+        println!("start...");
+    }
     let file_name = name.clone() + ".zip";
     let mut dloader = downloader::Downloader::builder()
         .parallel_requests(1)
@@ -28,7 +36,7 @@ pub fn create_object(name: String) -> Result<()> {
 }
 
 fn archive(file: String, target: &Path) -> Result<()> {
-    let current_dir = env::current_dir().expect("Failed to determine current directory");
+    let current_dir = env::current_dir()?;
     let zip_file = fs::File::open(file.clone())?;
     let mut zip = zip::ZipArchive::new(zip_file)?;
 
