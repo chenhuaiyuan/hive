@@ -3,8 +3,6 @@ pub mod file;
 #[cfg(feature = "json")]
 pub mod json;
 
-pub mod mysql;
-
 pub mod lua_request;
 
 use serde_json::Map;

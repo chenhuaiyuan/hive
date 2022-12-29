@@ -1,6 +1,4 @@
 local function update_func(new_func, old_func)
-  assert("function" == type(new_func))
-  assert("function" == type(old_func))
 
   -- Get upvalues of old function.
   local old_upvalue_map = {}
@@ -14,7 +12,7 @@ local function update_func(new_func, old_func)
   for i = 1, math.huge do
     local name, value = debug.getupvalue(new_func, i)
     if not name then break end
-    print("set up value: name:", name)
+    print("set up value: ", name)
     local old_value = old_upvalue_map[name]
     if old_value then
       debug.setupvalue(new_func, i, old_value)
@@ -23,8 +21,6 @@ local function update_func(new_func, old_func)
 end
 
 local function update_table(new_table, old_table)
-  assert("table" == type(new_table))
-  assert("table" == type(old_table))
 
   -- Compare 2 tables, and update old table.
   for key, value in pairs(new_table) do
@@ -33,7 +29,7 @@ local function update_table(new_table, old_table)
     if type_value == "function" and type(old_value) == "function" then
       update_func(value, old_value)
       old_table[key] = value
-    elseif type_value == "table" and type(old_value) == "type" then
+    elseif type_value == "table" and type(old_value) == "table" then
       update_table(value, old_value)
     end
   end
@@ -69,7 +65,7 @@ local function hotfix(filename)
     oldModule = package.loaded[filename]
     package.loaded[filename] = nil
   else
-    print("this file nevev loaded: ", filename)
+    print("this file not loaded: ", filename)
     return
   end
   local ok, err = pcall(require, filename)
@@ -83,6 +79,19 @@ local function hotfix(filename)
 
   if type(newModule) == 'table' and type(oldModule) == 'table' then
     update_table(newModule, oldModule)
+  end
+
+  do
+    if package.loaded['route'] then
+      local _oldModule = package.loaded['route']
+      package.loaded['route'] = nil
+      local _ok, _err = pcall(require, 'route')
+      if not _ok then
+        package.loaded['route'] = _oldModule
+        print("reload lua file failed.", _err)
+        return
+      end
+    end
   end
 
   print("replaced succeed")

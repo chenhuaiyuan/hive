@@ -11,11 +11,10 @@
 - [ ] grpc
 
 除此之外，hive还自带一些实用的库，有alipay，nanoid，req，xlsxwriter等库，存放在ext目录，需要手动安装，安装方法：在终端进入对应的库目录，运行`luarocks make`。
-目前hive自带mysql，后期将会将mysql移出hive软件，以库的形式集成。
 
 ### 准备开发的库
 
-- [ ] mysql
+- [x] mysql
 - [ ] redis
 - [ ] tera(后端html模板引擎)
 

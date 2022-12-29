@@ -9,9 +9,7 @@ use crate::error::{create_error, Error as WebError, Result as WebResult};
 use crate::init_object::create_object;
 use crate::notify::async_watch;
 use crate::router::create_router;
-use crate::utils::{
-    file::File, json::create_table_to_json_string, lua_request::LuaRequest, mysql::MysqlPool,
-};
+use crate::utils::{file::File, json::create_table_to_json_string, lua_request::LuaRequest};
 use clap::Parser;
 use fast_log::{
     config::Config,
@@ -237,7 +235,6 @@ fn main() -> WebResult<()> {
     hive.set("table_to_json", create_table_to_json_string(&lua)?)?;
     #[cfg(feature = "file")]
     hive.set("file", lua.create_proxy::<File>()?)?;
-    hive.set("mysql_pool", lua.create_proxy::<MysqlPool>()?)?;
 
     hive.set("web_error", create_error(&lua)?)?;
     hive.set("router", create_router(&lua)?)?;

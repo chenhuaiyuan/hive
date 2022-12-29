@@ -1,7 +1,8 @@
-use crate::error::Error as WebError;
+mod error;
 use dateparser::DateTimeUtc;
+use error::Error as WebError;
 use mlua::prelude::*;
-use mysql_async::{prelude::Queryable, Opts, Pool, Row, Value as MysqlValue};
+use mysql::{prelude::Queryable, Opts, Pool, Row, Value as MysqlValue};
 use std::sync::Arc;
 
 macro_rules! row_to_table {
@@ -31,18 +32,18 @@ impl LuaUserData for MysqlPool {
         _methods.add_function(
             "new",
             |_, (username, password, address): (String, String, String)| {
-                let mysql_url = format!("mysql://{username}:{password}@{address}");
+                let mysql_url = format!("mysql://{}:{}@{}", username, password, address);
                 let opts = Opts::from_url(&mysql_url).to_lua_err()?;
-                let pool = Pool::new(opts);
+                let pool = Pool::new(opts).to_lua_err()?;
                 Ok(MysqlPool(pool))
             },
         );
-        _methods.add_async_method("query", |lua, this, sql: String| async move {
+        _methods.add_method("query", |lua, this, sql: String| {
             let query_data = lua.create_table()?;
 
-            let mut conn = this.0.get_conn().await.to_lua_err()?;
+            let mut conn = this.0.get_conn().to_lua_err()?;
 
-            let rows: Vec<Row> = conn.query(sql).await.to_lua_err()?;
+            let rows: Vec<Row> = conn.query(sql).to_lua_err()?;
             let mut i = 1;
             for mut row in rows {
                 let data = row_to_table!(row, lua);
@@ -52,10 +53,10 @@ impl LuaUserData for MysqlPool {
 
             Ok(query_data)
         });
-        _methods.add_async_method("query_first", |lua, this, sql: String| async move {
-            let mut conn = this.0.get_conn().await.to_lua_err()?;
+        _methods.add_method("query_first", |lua, this, sql: String| {
+            let mut conn = this.0.get_conn().to_lua_err()?;
 
-            let row: Option<Row> = conn.query_first(sql).await.to_lua_err()?;
+            let row: Option<Row> = conn.query_first(sql).to_lua_err()?;
             if let Some(mut row) = row {
                 let data = row_to_table!(row, lua);
                 Ok(data)
@@ -63,13 +64,13 @@ impl LuaUserData for MysqlPool {
                 lua.create_table()
             }
         });
-        _methods.add_async_method(
+        _methods.add_method(
             "exec",
-            |lua, this, (sql, params): (String, LuaMultiValue)| async move {
-                let mut conn = this.0.get_conn().await.to_lua_err()?;
+            |lua, this, (sql, params): (String, LuaMultiValue)| {
+                let mut conn = this.0.get_conn().to_lua_err()?;
                 if params.is_empty() {
                     let query_data = lua.create_table()?;
-                    let rows: Vec<Row> = conn.exec(sql, ()).await.to_lua_err()?;
+                    let rows: Vec<Row> = conn.exec(sql, ()).to_lua_err()?;
                     let mut i = 1;
                     for mut row in rows {
                         let data = row_to_table!(row, lua);
@@ -91,7 +92,7 @@ impl LuaUserData for MysqlPool {
                         new_params.push(lua_value_to_mysql_value(v));
                     }
                 }
-                let rows: Vec<Row> = conn.exec(sql, new_params).await.to_lua_err()?;
+                let rows: Vec<Row> = conn.exec(sql, new_params).to_lua_err()?;
 
                 let query_data = lua.create_table()?;
                 let mut i = 1;
@@ -103,12 +104,12 @@ impl LuaUserData for MysqlPool {
                 Ok(query_data)
             },
         );
-        _methods.add_async_method(
+        _methods.add_method(
             "exec_first",
-            |lua, this, (sql, params): (String, LuaMultiValue)| async move {
-                let mut conn = this.0.get_conn().await.to_lua_err()?;
+            |lua, this, (sql, params): (String, LuaMultiValue)| {
+                let mut conn = this.0.get_conn().to_lua_err()?;
                 if params.is_empty() {
-                    let row: Option<Row> = conn.exec_first(sql, ()).await.to_lua_err()?;
+                    let row: Option<Row> = conn.exec_first(sql, ()).to_lua_err()?;
                     if let Some(mut row) = row {
                         let data = row_to_table!(row, lua);
                         return Ok(data);
@@ -128,7 +129,7 @@ impl LuaUserData for MysqlPool {
                         new_params.push(lua_value_to_mysql_value(v));
                     }
                 }
-                let row: Option<Row> = conn.exec_first(sql, new_params).await.to_lua_err()?;
+                let row: Option<Row> = conn.exec_first(sql, new_params).to_lua_err()?;
 
                 if let Some(mut row) = row {
                     let data = row_to_table!(row, lua);
@@ -138,12 +139,12 @@ impl LuaUserData for MysqlPool {
                 }
             },
         );
-        _methods.add_async_method(
+        _methods.add_method(
             "exec_drop",
-            |_, this, (sql, params): (String, LuaMultiValue)| async move {
-                let mut conn = this.0.get_conn().await.to_lua_err()?;
+            |_, this, (sql, params): (String, LuaMultiValue)| {
+                let mut conn = this.0.get_conn().to_lua_err()?;
                 if params.is_empty() {
-                    conn.exec_drop(sql, ()).await.to_lua_err()?;
+                    conn.exec_drop(sql, ()).to_lua_err()?;
                     return Ok(());
                 }
                 let params = params.into_vec();
@@ -159,14 +160,14 @@ impl LuaUserData for MysqlPool {
                     }
                 }
 
-                conn.exec_drop(sql, new_params).await.to_lua_err()?;
+                conn.exec_drop(sql, new_params).to_lua_err()?;
                 Ok(())
             },
         );
-        _methods.add_async_method(
+        _methods.add_method(
             "exec_batch",
-            |_, this, (sql, params): (String, LuaMultiValue)| async move {
-                let mut conn = this.0.get_conn().await.to_lua_err()?;
+            |_, this, (sql, params): (String, LuaMultiValue)| {
+                let mut conn = this.0.get_conn().to_lua_err()?;
                 if params.is_empty() {
                     Err(LuaError::ExternalError(Arc::new(WebError::new(
                         6011,
@@ -201,7 +202,7 @@ impl LuaUserData for MysqlPool {
                             ))));
                         }
                     }
-                    conn.exec_batch(sql, new_params).await.to_lua_err()?;
+                    conn.exec_batch(sql, new_params).to_lua_err()?;
                     Ok(())
                 }
             },
@@ -209,7 +210,7 @@ impl LuaUserData for MysqlPool {
     }
 }
 
-fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<LuaValue> {
+fn mysql_value_to_lua_value(val: MysqlValue, lua: &Lua) -> LuaResult<LuaValue> {
     match val {
         MysqlValue::NULL => {
             let data = lua.create_string("");
@@ -227,7 +228,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
             }
         }
         MysqlValue::Int(v) => Ok(LuaValue::Integer(v)),
-        MysqlValue::UInt(v) => Ok(LuaValue::Number(v as f64)),
+        MysqlValue::UInt(v) => Ok(LuaValue::String(lua.create_string(&v.to_string())?)),
         MysqlValue::Float(v) => Ok(LuaValue::Number(v as f64)),
         MysqlValue::Double(v) => Ok(LuaValue::Number(v)),
         MysqlValue::Date(y, m, d, h, min, s, _) => {
@@ -235,7 +236,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
 
             match format {
                 LuaValue::Nil => {
-                    let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
+                    let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
                     let datetime = date.parse::<DateTimeUtc>();
                     match datetime {
                         Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
@@ -254,21 +255,21 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
                         temp.set("sec", s)?;
                         Ok(LuaValue::Table(temp))
                     } else if ty == "timestamp" {
-                        let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
+                        let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
                         let datetime = date.parse::<DateTimeUtc>();
                         match datetime {
                             Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
                             Err(_) => Ok(LuaValue::Nil),
                         }
                     } else if ty == "string" {
-                        let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
+                        let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
                         let data = lua.create_string(&date);
                         match data {
                             Ok(val) => Ok(LuaValue::String(val)),
                             Err(_) => Ok(LuaValue::Nil),
                         }
                     } else {
-                        let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
+                        let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
                         let datetime = date.parse::<DateTimeUtc>();
                         match datetime {
                             Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
@@ -277,7 +278,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
                     }
                 }
                 _ => {
-                    let date = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
+                    let date = format!("{}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, h, min, s);
                     let datetime = date.parse::<DateTimeUtc>();
                     match datetime {
                         Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
@@ -291,7 +292,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
 
             match format {
                 LuaValue::Nil => {
-                    let time = format!("{h:02}:{m:02}:{s:02}");
+                    let time = format!("{:02}:{:02}:{:02}", h, m, s);
                     let data = lua.create_string(&time);
                     match data {
                         Ok(val) => Ok(LuaValue::String(val)),
@@ -307,7 +308,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
                         temp.set("sec", s)?;
                         Ok(LuaValue::Table(temp))
                     } else {
-                        let time = format!("{h:02}:{m:02}:{s:02}");
+                        let time = format!("{:02}:{:02}:{:02}", h, m, s);
                         let data = lua.create_string(&time);
                         match data {
                             Ok(val) => Ok(LuaValue::String(val)),
@@ -316,7 +317,7 @@ fn mysql_value_to_lua_value(val: mysql_async::Value, lua: &Lua) -> LuaResult<Lua
                     }
                 }
                 _ => {
-                    let time = format!("{h:02}:{m:02}:{s:02}");
+                    let time = format!("{:02}:{:02}:{:02}", h, m, s);
                     let data = lua.create_string(&time);
                     match data {
                         Ok(val) => Ok(LuaValue::String(val)),
@@ -346,4 +347,9 @@ fn lua_value_to_mysql_value(val: LuaValue) -> MysqlValue {
         LuaValue::UserData(_) => MysqlValue::NULL,
         _ => MysqlValue::NULL,
     }
+}
+
+#[mlua::lua_module]
+fn mysql(lua: &Lua) -> LuaResult<LuaAnyUserData> {
+    lua.create_proxy::<MysqlPool>()
 }
