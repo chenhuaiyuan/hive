@@ -17,7 +17,7 @@ use fast_log::{
     plugin::{file_split::RollingType, packer::ZipPacker},
 };
 use futures_util::Future;
-use http::{header::HeaderValue, header::CONTENT_TYPE};
+// use http::{header::HeaderValue, header::CONTENT_TYPE};
 use hyper::service::Service;
 use hyper::{server::conn::AddrStream, Body, Request, Response, Server};
 use mlua::prelude::*;
@@ -59,45 +59,84 @@ impl Service<Request<Body>> for Svc {
             let handler: LuaFunction = lua.named_registry_value("http_handler")?;
 
             match handler
-                .call_async::<_, LuaTable>((method, path, lua_req))
+                .call_async::<_, LuaValue>((method, path, lua_req))
                 .await
             {
-                Ok(lua_resp) => {
-                    let status = lua_resp
-                        .get::<_, Option<u16>>("status")
-                        .to_lua_err()?
-                        .unwrap_or(200);
-                    let mut resp = Response::builder().status(status);
+                Ok(lua_resp) => match lua_resp {
+                    LuaValue::Integer(v) => Ok(Response::new(Body::from(v.to_string()))),
+                    LuaValue::Number(v) => Ok(Response::new(Body::from(v.to_string()))),
+                    LuaValue::String(v) => Ok(Response::new(Body::from(v.to_str()?.to_string()))),
+                    LuaValue::Table(v) => {
+                        let status = v
+                            .get::<_, Option<u16>>("status")
+                            .to_lua_err()?
+                            .unwrap_or(200);
+                        let mut resp = Response::builder().status(status);
 
-                    if let Some(headers) = lua_resp
-                        .get::<_, Option<LuaTable>>("headers")
-                        .to_lua_err()?
-                    {
-                        for pair in headers.pairs::<String, LuaString>() {
-                            let (h, v) = pair.to_lua_err()?;
-                            resp = resp.header(&h, v.as_bytes());
+                        if let Some(headers) =
+                            v.get::<_, Option<LuaTable>>("headers").to_lua_err()?
+                        {
+                            for pair in headers.pairs::<String, LuaString>() {
+                                let (h, v) = pair.to_lua_err()?;
+                                resp = resp.header(&h, v.as_bytes());
+                            }
                         }
+
+                        let body = v
+                            .get::<_, Option<LuaString>>("body")
+                            .to_lua_err()?
+                            .map(|b| Body::from(b.as_bytes().to_vec()))
+                            .unwrap_or_else(Body::empty);
+
+                        Ok(resp.body(body).unwrap())
                     }
-
-                    let body = lua_resp
-                        .get::<_, Option<LuaString>>("body")
-                        .to_lua_err()?
-                        .map(|b| Body::from(b.as_bytes().to_vec()))
-                        .unwrap_or_else(Body::empty);
-
-                    Ok(resp.body(body).unwrap())
-                }
+                    _ => Ok(Response::new(Body::empty())),
+                },
                 Err(err) => {
                     println!("{err:?}");
+                    let exception: LuaFunction = lua.named_registry_value("exception")?;
                     let (code, message) = return_err_info(err);
                     log::error!("{}", message);
-                    Ok(Response::builder()
-                        .status(200)
-                        .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
-                        .body(Body::from(format!(
-                            r#"{{"code": {code}, "message": "{message}", "data": ""}}"#
-                        )))
-                        .unwrap())
+                    let resp = exception.call_async::<_, LuaValue>((code, message)).await?;
+                    match resp {
+                        LuaValue::Integer(v) => Ok(Response::new(Body::from(v.to_string()))),
+                        LuaValue::Number(v) => Ok(Response::new(Body::from(v.to_string()))),
+                        LuaValue::String(v) => {
+                            Ok(Response::new(Body::from(v.to_str()?.to_string())))
+                        }
+                        LuaValue::Table(v) => {
+                            let status = v
+                                .get::<_, Option<u16>>("status")
+                                .to_lua_err()?
+                                .unwrap_or(200);
+                            let mut resp = Response::builder().status(status);
+
+                            if let Some(headers) =
+                                v.get::<_, Option<LuaTable>>("headers").to_lua_err()?
+                            {
+                                for pair in headers.pairs::<String, LuaString>() {
+                                    let (h, v) = pair.to_lua_err()?;
+                                    resp = resp.header(&h, v.as_bytes());
+                                }
+                            }
+
+                            let body = v
+                                .get::<_, Option<LuaString>>("body")
+                                .to_lua_err()?
+                                .map(|b| Body::from(b.as_bytes().to_vec()))
+                                .unwrap_or_else(Body::empty);
+
+                            Ok(resp.body(body).unwrap())
+                        }
+                        _ => Ok(Response::new(Body::empty())),
+                    }
+                    // Ok(Response::builder()
+                    //     .status(200)
+                    //     .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
+                    //     .body(Body::from(format!(
+                    //         r#"{{"code": {code}, "message": "{message}", "data": ""}}"#
+                    //     )))
+                    //     .unwrap())
                 }
             }
         })
@@ -192,7 +231,7 @@ pub struct Args {
     /// 创建项目，举例：hive --create test
     #[arg(long)]
     create: Option<String>,
-    /// 热重载，此功能还未实现
+    /// release环境下热重载，此功能还未实现
     #[arg(long, default_value_t = false)]
     reload: bool,
 }
@@ -239,15 +278,16 @@ fn main() -> WebResult<()> {
     hive.set("web_error", create_error(&lua)?)?;
     hive.set("router", create_router(&lua)?)?;
     hive.set("env", lua.create_table_from([("dev", args.dev)])?)?;
+    hive.set("version", lua.create_string(env!("CARGO_PKG_VERSION"))?)?;
     globals.set("hive", hive)?;
     // globals.set("DATEFORMAT", "timestamp")?;
 
     // let env = lua.create_table()?;
     // env.set("crypto", LuaCrypto)?;
 
-    let file = fs::read_to_string(args.file.clone()).expect("read file failed");
+    let file = fs::read(args.file.clone()).expect("read file failed");
 
-    let handler: LuaFunction = lua.load(&file).eval()?;
+    let (handler, exception): (LuaFunction, LuaFunction) = lua.load(&file).eval()?;
 
     let is_ipv4: bool = globals.get("ISIPV4").unwrap_or(true);
     let addr = if is_ipv4 {
@@ -261,6 +301,7 @@ fn main() -> WebResult<()> {
     };
     println!("Listening on http://{addr}");
     lua.set_named_registry_value("http_handler", handler)?;
+    lua.set_named_registry_value("exception", exception)?;
     block_on(async {
         let server = Server::bind(&addr)
             .executor(LocalExec)

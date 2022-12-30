@@ -77,11 +77,13 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
                                 let data = file.rsplit_once('.');
                                 if let Some((mode, _)) = data {
                                     hotfix.call::<_, ()>(mode)?;
-                                    lua.unset_named_registry_value("http_handler")?;
-                                    let file = tokio::fs::read_to_string(args.file.clone()).await?;
+                                    // lua.unset_named_registry_value("exception")?;
+                                    // lua.unset_named_registry_value("http_handler")?;
+                                    let file = tokio::fs::read(args.file.clone()).await?;
 
-                                    let handler: LuaFunction =
-                                        lua.load(&file).eval().expect("load lua code fail");
+                                    let (handler, exception): (LuaFunction, LuaFunction) =
+                                        lua.load(&file).eval()?;
+                                    lua.set_named_registry_value("exception", exception)?;
                                     lua.set_named_registry_value("http_handler", handler)?;
                                 }
                             }
@@ -97,11 +99,13 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
                         //     .unwrap();
                         // }
                     } else {
-                        lua.unset_named_registry_value("http_handler")?;
-                        let file = tokio::fs::read_to_string(args.file.clone()).await?;
+                        // lua.unset_named_registry_value("exception")?;
+                        // lua.unset_named_registry_value("http_handler")?;
+                        let file = tokio::fs::read(args.file.clone()).await?;
 
-                        let handler: LuaFunction =
-                            lua.load(&file).eval().expect("load lua code fail");
+                        let (handler, exception): (LuaFunction, LuaFunction) =
+                            lua.load(&file).eval()?;
+                        lua.set_named_registry_value("exception", exception)?;
                         lua.set_named_registry_value("http_handler", handler)?;
                     }
                 }
