@@ -8,14 +8,14 @@ use nanoid::nanoid;
 use tokio::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-pub struct File {
+pub struct FileData {
     field_name: String,
     file_name: String,
     content_type: String,
     pub content: Vec<u8>,
 }
 
-impl File {
+impl FileData {
     pub fn new<S: Into<String>>(
         field_name: S,
         file_name: S,
@@ -31,7 +31,7 @@ impl File {
     }
 }
 
-impl LuaUserData for File {
+impl LuaUserData for FileData {
     fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(_fields: &mut F) {
         _fields.add_field_method_get("field_name", |lua, this| {
             lua.create_string(&this.field_name)
@@ -177,7 +177,7 @@ impl LuaUserData for File {
                     let mut f = fs::File::open(path).await.to_lua_err()?;
                     let mut buffer = Vec::new();
                     f.read_to_end(&mut buffer).await?;
-                    let file = File::new(field_name[0], file_name, ext, buffer);
+                    let file = FileData::new(field_name[0], file_name, ext, buffer);
                     Ok(file)
                 } else {
                     Err(LuaError::ExternalError(Arc::new(WebError::new(

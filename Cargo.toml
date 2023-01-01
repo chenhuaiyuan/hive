@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["file", "json"]
-file = []
+default = ["file_data", "json"]
+file_data = []
 json = []
 
 [dependencies]

@@ -1,4 +1,4 @@
-use super::file::File;
+use super::file_data::FileData;
 use crate::error::Error as WebError;
 use http::{header, header::CONTENT_TYPE, HeaderMap, Method};
 use hyper::{Body, Request};
@@ -255,7 +255,8 @@ impl LuaUserData for LuaRequest {
                     let content_type = content_type
                         .clone()
                         .unwrap_or_else(|| "image/jpeg".to_string());
-                    let file = File::new(field_name.clone(), file_name, content_type, field_data);
+                    let file =
+                        FileData::new(field_name.clone(), file_name, content_type, field_data);
                     form_data.set(field_name, lua.create_userdata(file)?)?;
                 } else if let Some(field_name) = name.clone() {
                     let data = String::from_utf8(field_data).to_lua_err()?;
