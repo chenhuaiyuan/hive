@@ -16,7 +16,7 @@
 
 - [x] mysql
 - [ ] redis
-- [ ] tera(后端html模板引擎)
+- [x] tera(后端html模板引擎)
 
 
 ### 安装
