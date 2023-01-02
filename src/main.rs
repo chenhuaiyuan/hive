@@ -304,17 +304,27 @@ fn main() -> WebResult<()> {
     println!("Listening on http://{addr}");
     lua.set_named_registry_value("http_handler", handler)?;
     lua.set_named_registry_value("exception", exception)?;
-    block_on(async {
-        let server = Server::bind(&addr)
-            .executor(LocalExec)
-            .serve(MakeSvc(lua.clone()));
-        let local = tokio::task::LocalSet::new();
-        let j = tokio::join! {
-            async_watch(lua, args.clone()),
-            local.run_until(server)
-        };
-        j.0.unwrap();
-    });
+    if args.dev {
+        block_on(async {
+            let server = Server::bind(&addr)
+                .executor(LocalExec)
+                .serve(MakeSvc(lua.clone()));
+            let local = tokio::task::LocalSet::new();
+            let j = tokio::join! {
+                async_watch(lua, args.clone()),
+                local.run_until(server)
+            };
+            j.0.unwrap();
+        });
+    } else {
+        block_on(async {
+            let server = Server::bind(&addr)
+                .executor(LocalExec)
+                .serve(MakeSvc(lua.clone()));
+            let local = tokio::task::LocalSet::new();
+            local.run_until(server).await.unwrap();
+        });
+    }
     Ok(())
 }
 
