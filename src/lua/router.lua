@@ -135,8 +135,9 @@ function Router:match(method, path, fun, middleware)
 
   for m, routes in pairs(parsed_methods) do
     for p, f in pairs(routes) do
-      if not self._tree[m] then self._tree[m] = {} end
-      match_one_path(self._tree[m], p, f, middleware)
+      local _m = m:upper()
+      if not self._tree[_m] then self._tree[_m] = {} end
+      match_one_path(self._tree[_m], p, f, middleware)
     end
   end
 end

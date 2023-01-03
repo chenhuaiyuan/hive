@@ -1,6 +1,7 @@
 # Hive
 
-`hive`是一个rust和lua结合的 web framework。
+`hive`打算成为一个支持多脚本语言的web framework。
+目前只支持lua语言，未来将支持JavaScript和python
 
 ## features
 
