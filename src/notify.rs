@@ -52,20 +52,30 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
                                 hotfix.call::<_, ()>(mode)?;
                                 let file = tokio::fs::read(args.file.clone()).await?;
 
-                                let (handler, exception): (LuaFunction, LuaFunction) =
-                                    lua.load(&file).eval()?;
-                                lua.set_named_registry_value("exception", exception)?;
-                                lua.set_named_registry_value("http_handler", handler)?;
+                                let handler: LuaTable = lua.load(&file).eval()?;
+                                lua.set_named_registry_value(
+                                    "http_handler",
+                                    handler.get::<_, LuaFunction>("serve")?,
+                                )?;
+                                lua.set_named_registry_value(
+                                    "exception",
+                                    handler.get::<_, LuaFunction>("exception")?,
+                                )?;
                             }
                         }
                     }
                 } else {
                     let file = tokio::fs::read(args.file.clone()).await?;
 
-                    let (handler, exception): (LuaFunction, LuaFunction) =
-                        lua.load(&file).eval()?;
-                    lua.set_named_registry_value("exception", exception)?;
-                    lua.set_named_registry_value("http_handler", handler)?;
+                    let handler: LuaTable = lua.load(&file).eval()?;
+                    lua.set_named_registry_value(
+                        "http_handler",
+                        handler.get::<_, LuaFunction>("serve")?,
+                    )?;
+                    lua.set_named_registry_value(
+                        "exception",
+                        handler.get::<_, LuaFunction>("exception")?,
+                    )?;
                 }
             }
         }

@@ -10,7 +10,9 @@ mod utils;
 use crate::error::{create_error, Result as WebResult};
 use crate::init_object::create_object;
 #[cfg(feature = "lua")]
-use crate::lua::server::MakeSvc;
+use crate::lua::server::create_server;
+#[cfg(feature = "lua")]
+use crate::lua::service::MakeSvc;
 use crate::notify::async_watch;
 use crate::router::create_router;
 use crate::utils::{file_data::FileData, json::create_table_to_json_string};
@@ -25,8 +27,8 @@ use hyper::Server;
 use mlua::prelude::*;
 use once_cell::sync::Lazy;
 use std::fs;
+use std::net::IpAddr;
 use std::net::SocketAddr;
-use std::net::{IpAddr, Ipv6Addr};
 use std::sync::Arc;
 
 pub static HALF_NUM_CPUS: Lazy<usize> = Lazy::new(|| 1.max(num_cpus::get() / 2));
@@ -93,29 +95,24 @@ fn main() -> WebResult<()> {
     hive.set("router", create_router(&lua)?)?;
     hive.set("env", lua.create_table_from([("dev", args.dev)])?)?;
     hive.set("version", lua.create_string(env!("CARGO_PKG_VERSION"))?)?;
+    hive.set("server", create_server(&lua)?)?;
     globals.set("hive", hive)?;
-    // globals.set("DATEFORMAT", "timestamp")?;
-
-    // let env = lua.create_table()?;
-    // env.set("crypto", LuaCrypto)?;
 
     let file = fs::read(args.file.clone()).expect("read file failed");
 
-    let (handler, exception): (LuaFunction, LuaFunction) = lua.load(&file).eval()?;
+    let handler: LuaTable = lua.load(&file).eval()?;
 
-    let is_ipv4: bool = globals.get("ISIPV4").unwrap_or(true);
+    let is_ipv4: bool = handler.get("is_ipv4").unwrap_or(true);
+    let localhost: String = handler.get("addr").unwrap_or("127.0.0.1".to_owned());
+    let port: u16 = handler.get("port").unwrap_or(3000);
     let addr = if is_ipv4 {
-        let localhost: String = globals
-            .get("LOCALHOST")
-            .unwrap_or("127.0.0.1:3000".to_owned());
-        localhost.parse()?
+        SocketAddr::new(IpAddr::V4(localhost.parse()?), port)
     } else {
-        let port: u16 = globals.get("PORT").unwrap_or(3000);
-        SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)), port)
+        SocketAddr::new(IpAddr::V6(localhost.parse()?), port)
     };
     println!("Listening on http://{addr}");
-    lua.set_named_registry_value("http_handler", handler)?;
-    lua.set_named_registry_value("exception", exception)?;
+    lua.set_named_registry_value("http_handler", handler.get::<_, LuaFunction>("serve")?)?;
+    lua.set_named_registry_value("exception", handler.get::<_, LuaFunction>("exception")?)?;
     if args.dev {
         block_on(async {
             let server = Server::bind(&addr)
@@ -123,7 +120,7 @@ fn main() -> WebResult<()> {
                 .serve(MakeSvc(lua.clone()));
             let local = tokio::task::LocalSet::new();
             let j = tokio::join! {
-                async_watch(lua, args.clone()),
+                async_watch(lua.clone(), args.clone()),
                 local.run_until(server)
             };
             j.0.unwrap();
