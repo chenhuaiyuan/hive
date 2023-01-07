@@ -1,12 +1,26 @@
 use super::file_data::FileData;
 use crate::error::Error as WebError;
+#[cfg(feature = "ws")]
+use crate::lua::websocket::handle_connection;
+#[cfg(feature = "ws")]
+use http::header::{
+    CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE,
+};
 use http::{header, header::CONTENT_TYPE, HeaderMap, Method};
+#[cfg(feature = "ws")]
+use http::{HeaderValue, StatusCode, Version};
 use hyper::{Body, Request};
 use mlua::prelude::*;
 use multer::Multipart;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+#[cfg(feature = "ws")]
+use tokio_tungstenite::WebSocketStream;
+#[cfg(feature = "ws")]
+use tungstenite::handshake::derive_accept_key;
+#[cfg(feature = "ws")]
+use tungstenite::protocol::Role;
 
 fn has_content_type(headers: &HeaderMap, expected_content_type: &mime::Mime) -> bool {
     let content_type = if let Some(content_type) = headers.get(header::CONTENT_TYPE) {
@@ -308,5 +322,77 @@ impl LuaUserData for LuaRequest {
             // );
             Ok(form_data)
         });
+        #[cfg(feature = "ws")]
+        _methods.add_async_function(
+            "upgrade",
+            |lua, (this, func): (LuaAnyUserData, LuaFunction)| async move {
+                let this = this.take::<Self>()?;
+                let upgrade = HeaderValue::from_static("Upgrade");
+                let websocket = HeaderValue::from_static("websocket");
+                let headers = this.0.headers();
+                let key = headers.get(SEC_WEBSOCKET_KEY);
+                let derived = key.map(|k| derive_accept_key(k.as_bytes()));
+                if this.0.method() != Method::GET
+                    || this.0.version() < Version::HTTP_11
+                    || !headers
+                        .get(CONNECTION)
+                        .and_then(|h| h.to_str().ok())
+                        .map(|h| {
+                            h.split(|c| c == ' ' || c == ',')
+                                .any(|p| p.eq_ignore_ascii_case(upgrade.to_str().unwrap()))
+                        })
+                        .unwrap_or(false)
+                    || !headers
+                        .get(UPGRADE)
+                        .and_then(|h| h.to_str().ok())
+                        .map(|h| h.eq_ignore_ascii_case("websocket"))
+                        .unwrap_or(false)
+                    || !headers
+                        .get(SEC_WEBSOCKET_VERSION)
+                        .map(|h| h == "13")
+                        .unwrap_or(false)
+                    || key.is_none()
+                {
+                    Err(LuaError::ExternalError(Arc::new(WebError::new(
+                        5047,
+                        "Please check whether the parameter transfer is correct",
+                    ))))
+                } else {
+                    // let ver = this.0.version();
+                    let mut req = this.0;
+                    let func: LuaFunction<'static> = unsafe { std::mem::transmute(func) };
+                    tokio::task::spawn_local(async move {
+                        match hyper::upgrade::on(&mut req).await {
+                            Ok(upgraded) => {
+                                handle_connection(
+                                    func,
+                                    WebSocketStream::from_raw_socket(upgraded, Role::Server, None)
+                                        .await,
+                                    this.1,
+                                )
+                                .await
+                                .unwrap();
+                            }
+                            Err(e) => println!("upgrade error: {e}"),
+                        }
+                    });
+                    let res = lua.create_table()?;
+                    let headers = lua.create_table()?;
+                    res.set(
+                        "status",
+                        LuaValue::Integer(StatusCode::SWITCHING_PROTOCOLS.as_u16() as i64),
+                    )?;
+                    res.set("version", lua.create_string("HTTP/1.1")?)?;
+                    headers.set(CONNECTION.as_str(), lua.create_string(upgrade.as_bytes())?)?;
+                    headers.set(UPGRADE.as_str(), lua.create_string(websocket.as_bytes())?)?;
+                    headers.set(
+                        SEC_WEBSOCKET_ACCEPT.as_str(),
+                        lua.create_string(&derived.unwrap())?,
+                    )?;
+                    res.set("headers", LuaValue::Table(headers))?;
+                    Ok(res)
+                }
+            },
+        );
     }
 }
