@@ -13,11 +13,8 @@ use crate::init_object::create_object;
 use crate::lua::server::create_server;
 #[cfg(feature = "lua")]
 use crate::lua::service::MakeSvc;
-<<<<<<< HEAD
-=======
 #[cfg(feature = "ws")]
 use crate::lua::ws::create_message;
->>>>>>> dev
 use crate::notify::async_watch;
 use crate::router::create_router;
 use crate::utils::{file_data::FileData, json::create_table_to_json_string};
@@ -101,11 +98,8 @@ fn main() -> WebResult<()> {
     hive.set("env", lua.create_table_from([("dev", args.dev)])?)?;
     hive.set("version", lua.create_string(env!("CARGO_PKG_VERSION"))?)?;
     hive.set("server", create_server(&lua)?)?;
-<<<<<<< HEAD
-=======
     #[cfg(feature = "ws")]
     hive.set("ws_message", create_message(&lua)?)?;
->>>>>>> dev
     globals.set("hive", hive)?;
 
     let file = fs::read(args.file.clone()).expect("read file failed");

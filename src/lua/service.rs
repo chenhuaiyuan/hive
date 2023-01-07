@@ -1,10 +1,8 @@
 use crate::error::Error as WebError;
 use crate::utils::lua_request::LuaRequest;
 use futures_util::Future;
-<<<<<<< HEAD
-=======
+
 use http::Version;
->>>>>>> dev
 use hyper::{server::conn::AddrStream, service::Service, Body, Request, Response};
 use mlua::prelude::*;
 use std::net::SocketAddr;
@@ -54,8 +52,6 @@ impl Service<Request<Body>> for Svc {
                             .unwrap_or(200);
                         let mut resp = Response::builder().status(status);
 
-<<<<<<< HEAD
-=======
                         let version = v.get::<_, Option<String>>("version").to_lua_err()?;
                         if let Some(ver) = version {
                             if ver == "HTTP/0.9" {
@@ -71,7 +67,6 @@ impl Service<Request<Body>> for Svc {
                             }
                         }
 
->>>>>>> dev
                         if let Some(headers) =
                             v.get::<_, Option<LuaTable>>("headers").to_lua_err()?
                         {
