@@ -5,10 +5,12 @@ use downloader::Error as DownloaderError;
 use fast_log::error::LogError;
 use hyper::Error as HyperError;
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
+use multer::Error as MulterError;
 use notify::Error as NotifyError;
 use std::io::Error as IoError;
 use std::net::AddrParseError;
 use std::path::StripPrefixError;
+use std::string::FromUtf8Error;
 use zip::result::ZipError;
 
 #[derive(Debug)]
@@ -111,6 +113,18 @@ impl From<IoError> for Error {
 
 impl From<StripPrefixError> for Error {
     fn from(value: StripPrefixError) -> Self {
+        Self::new(2007, value.to_string())
+    }
+}
+
+impl From<MulterError> for Error {
+    fn from(value: MulterError) -> Self {
+        Self::new(2007, value.to_string())
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(value: FromUtf8Error) -> Self {
         Self::new(2007, value.to_string())
     }
 }

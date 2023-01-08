@@ -3,6 +3,7 @@ mod init_object;
 #[cfg(feature = "lua")]
 mod lua;
 mod notify;
+mod request;
 mod router;
 #[cfg(any(feature = "file_data", feature = "json"))]
 mod utils;

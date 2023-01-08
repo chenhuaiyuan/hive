@@ -1,3 +1,4 @@
+pub mod lua_request;
 pub mod server;
 pub mod service;
 

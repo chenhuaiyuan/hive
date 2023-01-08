@@ -3,8 +3,6 @@ pub mod file_data;
 #[cfg(feature = "json")]
 pub mod json;
 
-pub mod lua_request;
-
 use serde_json::Map;
 
 use mlua::prelude::*;

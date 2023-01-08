@@ -1,5 +1,5 @@
+use super::lua_request::LuaRequest;
 use crate::error::Error as WebError;
-use crate::utils::lua_request::LuaRequest;
 use futures_util::Future;
 
 use http::Version;
