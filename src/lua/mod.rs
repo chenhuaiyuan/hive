@@ -1,4 +1,6 @@
 pub mod lua_request;
+#[cfg(feature = "lua")]
+pub mod notify;
 pub mod server;
 pub mod service;
 

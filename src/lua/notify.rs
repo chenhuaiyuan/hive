@@ -25,7 +25,7 @@ fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Resul
 
 pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
     let hotfix: LuaFunction = lua
-        .load(include_str!("./lua/hotfix.lua"))
+        .load(include_str!("./hotfix.lua"))
         .set_name("hive[hotfix]")?
         .eval()?;
     let (mut watcher, mut rx) = async_watcher()?;

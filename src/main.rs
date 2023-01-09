@@ -2,22 +2,20 @@ mod error;
 mod init_object;
 #[cfg(feature = "lua")]
 mod lua;
-mod notify;
 mod request;
-mod router;
 #[cfg(any(feature = "file_data", feature = "json"))]
 mod utils;
 
 use crate::error::{create_error, Result as WebResult};
 use crate::init_object::create_object;
 #[cfg(feature = "lua")]
+use crate::lua::notify::async_watch;
+#[cfg(feature = "lua")]
 use crate::lua::server::create_server;
 #[cfg(feature = "lua")]
 use crate::lua::service::MakeSvc;
 #[cfg(feature = "ws")]
 use crate::lua::ws::create_message;
-use crate::notify::async_watch;
-use crate::router::create_router;
 use crate::utils::{file_data::FileData, json::create_table_to_json_string};
 use clap::Parser;
 use fast_log::{
@@ -95,7 +93,6 @@ fn main() -> WebResult<()> {
     hive.set("file_data", lua.create_proxy::<FileData>()?)?;
 
     hive.set("web_error", create_error(&lua)?)?;
-    hive.set("router", create_router(&lua)?)?;
     hive.set("env", lua.create_table_from([("dev", args.dev)])?)?;
     hive.set("version", lua.create_string(env!("CARGO_PKG_VERSION"))?)?;
     hive.set("server", create_server(&lua)?)?;
