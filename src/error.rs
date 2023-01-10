@@ -1,9 +1,12 @@
 use std::fmt;
+#[cfg(feature = "lua")]
 use std::sync::Arc;
 
 use downloader::Error as DownloaderError;
 use fast_log::error::LogError;
 use hyper::Error as HyperError;
+
+#[cfg(feature = "lua")]
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use multer::Error as MulterError;
 use notify::Error as NotifyError;
@@ -21,6 +24,7 @@ pub struct Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
+#[cfg(feature = "lua")]
 pub fn create_error(lua: &Lua) -> LuaResult<LuaFunction> {
     lua.create_function(|_, (code, message): (u16, String)| {
         let err = Error::new(code, message.clone());
@@ -63,6 +67,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+#[cfg(feature = "lua")]
 impl From<MLuaError> for Error {
     fn from(value: MLuaError) -> Self {
         Self::new(2000, value.to_string())

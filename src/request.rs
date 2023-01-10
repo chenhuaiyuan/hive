@@ -1,12 +1,16 @@
-use crate::{
-    error::{Error as WebError, Result},
-    utils::file_data::FileData,
-};
+use crate::error::{Error as WebError, Result};
+#[cfg(feature = "lua")]
+use crate::file_data::FileDataTrait;
+#[cfg(feature = "lua")]
+use crate::lua::file_data::FileData;
+#[cfg(feature = "lua")]
+use http::CONTENT_TYPE;
 use http::{
-    header::{self, CONTENT_TYPE},
+    header::{self},
     HeaderMap, Method,
 };
 use hyper::{Body, Request as HyperRequest};
+#[cfg(feature = "lua")]
 use multer::Multipart;
 use std::{collections::HashMap, net::SocketAddr};
 
@@ -116,6 +120,7 @@ impl Request {
         Ok(param)
     }
 
+    #[cfg(feature = "lua")]
     pub async fn form<T, F1, F2, F3>(self, file_func: F1, f1: F2, f2: F3) -> Result<HttpData<T>>
     where
         T: Clone,

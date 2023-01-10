@@ -1,12 +1,14 @@
 mod error;
+mod file_data;
 mod init_object;
 #[cfg(feature = "lua")]
 mod lua;
 mod request;
-#[cfg(any(feature = "file_data", feature = "json"))]
-mod utils;
 
-use crate::error::{create_error, Result as WebResult};
+#[cfg(feature = "lua")]
+use crate::error::create_error;
+
+use crate::error::Result as WebResult;
 use crate::init_object::create_object;
 #[cfg(feature = "lua")]
 use crate::lua::notify::async_watch;
@@ -16,7 +18,8 @@ use crate::lua::server::create_server;
 use crate::lua::service::MakeSvc;
 #[cfg(feature = "ws")]
 use crate::lua::ws::create_message;
-use crate::utils::{file_data::FileData, json::create_table_to_json_string};
+#[cfg(feature = "lua")]
+use crate::lua::{file_data::FileData, json::create_table_to_json_string};
 use clap::Parser;
 use fast_log::{
     config::Config,
@@ -25,6 +28,7 @@ use fast_log::{
 };
 use futures_util::Future;
 use hyper::Server;
+#[cfg(feature = "lua")]
 use mlua::prelude::*;
 use once_cell::sync::Lazy;
 use std::fs;
@@ -37,7 +41,11 @@ pub static HALF_NUM_CPUS: Lazy<usize> = Lazy::new(|| 1.max(num_cpus::get() / 2))
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
     /// 读取的文件名
+    #[cfg(feature = "lua")]
     #[arg(short, long, default_value = "index.lua")]
+    file: String,
+    #[cfg(feature = "js")]
+    #[arg(short, long, default_value = "index.js")]
     file: String,
     /// 是否开启dev模式，默认值：false
     #[arg(short, long, default_value_t = false)]
@@ -53,30 +61,8 @@ pub struct Args {
     reload: bool,
 }
 
-fn main() -> WebResult<()> {
-    let args = Args::parse();
-    if args.dev {
-        fast_log::init(Config::new().console().file_split(
-            "logs/",
-            LogSize::MB(50),
-            RollingType::KeepNum(5),
-            ZipPacker {},
-        ))?;
-        log::info!("env: dev mode");
-    } else if let Some(object_name) = args.create {
-        create_object(object_name)?;
-        return Ok(());
-    } else {
-        fast_log::init(Config::new().console().file_split(
-            "logs/",
-            LogSize::MB(50),
-            RollingType::KeepNum(5),
-            ZipPacker {},
-        ))?;
-    }
-    log::info!("app start...");
-
-    // let lua = Lua::new().into_static();
+#[cfg(feature = "lua")]
+fn lua_run(args: Args) {
     let lua;
     unsafe {
         lua = Arc::new(Lua::unsafe_new());
@@ -87,9 +73,9 @@ fn main() -> WebResult<()> {
 
     let hive = lua.create_table()?;
 
-    #[cfg(feature = "json")]
+    #[cfg(feature = "lua")]
     hive.set("table_to_json", create_table_to_json_string(&lua)?)?;
-    #[cfg(feature = "file_data")]
+    #[cfg(feature = "lua")]
     hive.set("file_data", lua.create_proxy::<FileData>()?)?;
 
     hive.set("web_error", create_error(&lua)?)?;
@@ -136,6 +122,51 @@ fn main() -> WebResult<()> {
             local.run_until(server).await.unwrap();
         });
     }
+}
+
+#[cfg(feature = "js")]
+fn v8_run(args: Args) {
+    use v8::{Context, ContextScope, HandleScope, Isolate, Script, String};
+
+    let isolate = &mut Isolate::new(Default::default());
+
+    let scope = &mut HandleScope::new(isolate);
+    let context = Context::new(scope);
+    let scope = &mut ContextScope::new(scope, context);
+
+    let file = fs::read_to_string(args.file.clone()).expect("read file failed");
+    let code = String::new(scope, &file).unwrap();
+    let script = Script::compile(scope, code, None).unwrap();
+    script.run(scope).unwrap();
+}
+
+fn main() -> WebResult<()> {
+    let args = Args::parse();
+    if args.dev {
+        fast_log::init(Config::new().console().file_split(
+            "logs/",
+            LogSize::MB(50),
+            RollingType::KeepNum(5),
+            ZipPacker {},
+        ))?;
+        log::info!("env: dev mode");
+    } else if let Some(object_name) = args.create {
+        create_object(object_name)?;
+        return Ok(());
+    } else {
+        fast_log::init(Config::new().console().file_split(
+            "logs/",
+            LogSize::MB(50),
+            RollingType::KeepNum(5),
+            ZipPacker {},
+        ))?;
+    }
+    log::info!("app start...");
+
+    #[cfg(feature = "lua")]
+    lua_run(args);
+    #[cfg(feature = "js")]
+    v8_run(args);
     Ok(())
 }
 

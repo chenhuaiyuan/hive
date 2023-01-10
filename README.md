@@ -5,10 +5,10 @@
 
 ## features
 
-- [x] http/1.1
-- [x] dev 模式下自动热更新
-- [ ] release 模式下热更新
+- [x] lua dev 模式下自动热更新
+- [ ] lua release 模式下热更新
 - [x] websocket(可以使用，还有需要优化的地方)
+- [ ] js支持（使用v8引擎）
 
 除此之外，hive还自带一些实用的库，有alipay，nanoid，req，xlsxwriter等库，存放在ext目录，需要手动安装，安装方法：在终端进入对应的库目录，运行`luarocks make`。
 
@@ -24,8 +24,19 @@
 ```bash
 git clone https://github.com/chenhuaiyuan/hive.git
 cd hive
+# lua使用运行时
 cargo install --path . # 在本地安装hive软件，但默认不开启websocket功能，如需要使用websocket，请运行下面命令行
 cargo install --path . --features "lua ws"
+
+
+# 使用v8运行时
+bash download_macos_rusty_v8.sh
+# 如果不是macos系统，可通过自己系统下载对应的librusty_v8.a，可以加快编译速度
+# https://github.com/denoland/rusty_v8/releases
+export RUSTY_V8_ARCHIVE=$HOME/.cache/rusty_v8/v0.61.0/librusty_v8_debug_x86_64-apple-darwin.a
+# or
+export RUSTY_V8_ARCHIVE=$HOME/.cache/rusty_v8/v0.61.0/librusty_v8_release_x86_64-apple-darwin.a
+cargo install --path .
 ```
 
 ### 安装自带的库
