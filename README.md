@@ -24,11 +24,12 @@
 ```bash
 git clone https://github.com/chenhuaiyuan/hive.git
 cd hive
-# lua使用运行时
+# lua
+# 使用lua运行时
 cargo install --path . # 在本地安装hive软件，但默认不开启websocket功能，如需要使用websocket，请运行下面命令行
 cargo install --path . --features "lua ws"
 
-
+# js
 # 使用v8运行时
 bash download_macos_rusty_v8.sh
 # 如果不是macos系统，可通过自己系统下载对应的librusty_v8.a，可以加快编译速度
@@ -36,7 +37,7 @@ bash download_macos_rusty_v8.sh
 export RUSTY_V8_ARCHIVE=$HOME/.cache/rusty_v8/v0.61.0/librusty_v8_debug_x86_64-apple-darwin.a
 # or
 export RUSTY_V8_ARCHIVE=$HOME/.cache/rusty_v8/v0.61.0/librusty_v8_release_x86_64-apple-darwin.a
-cargo install --path .
+cargo install --path . --features "js"
 ```
 
 ### 安装自带的库
