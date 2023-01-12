@@ -1,6 +1,8 @@
 mod error;
 mod file_data;
 mod init_object;
+#[cfg(feature = "js")]
+mod js;
 #[cfg(feature = "lua")]
 mod lua;
 mod request;
@@ -128,24 +130,31 @@ fn lua_run(args: Args) {
 fn v8_run(args: Args) {
     use v8::{Context, ContextScope, HandleScope, Isolate, Script, String, TryCatch, V8};
 
+    use crate::js::server::create_server;
+
     let platform = v8::new_default_platform(0, false).make_shared();
     V8::initialize_platform(platform);
     V8::initialize();
 
     {
-        let mut isolate = Isolate::new(Default::default());
-        let mut scope = HandleScope::new(&mut isolate);
+        let isolate = &mut Isolate::new(Default::default());
+        let scope = &mut HandleScope::new(isolate);
 
-        let context = Context::new(&mut scope);
-        let mut scope = ContextScope::new(&mut scope, context);
+        let context = Context::new(scope);
+        let scope = &mut ContextScope::new(scope, context);
+
+        let function = create_server(scope);
+        let server_key = v8::String::new(scope, "server").unwrap();
+        let global = context.global(scope);
+        global.set(scope, server_key.into(), function.into());
 
         let file = fs::read_to_string(args.file.clone()).expect("read file failed");
-        let code = String::new(&mut scope, &file).unwrap();
+        let code = String::new(scope, &file).unwrap();
 
-        let script = Script::compile(&mut scope, code, None).unwrap();
-        let result = script.run(&mut scope).unwrap();
-        let result = result.to_string(&mut scope).unwrap();
-        println!("result: {}", result.to_rust_string_lossy(&mut scope));
+        let script = Script::compile(scope, code, None).unwrap();
+        let result = script.run(scope).unwrap();
+        let result = result.to_string(scope).unwrap();
+        println!("result: {}", result.to_rust_string_lossy(scope));
     }
 
     unsafe {

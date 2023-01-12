@@ -9,8 +9,13 @@
 - [ ] lua release 模式下热更新
 - [x] websocket(可以使用，还有需要优化的地方)
 - [ ] js支持（使用v8引擎）
+- [ ] 允许js调用rust、c/c++等静态语言生成的动态库
+- [ ] 允许调用node库
 
-除此之外，hive还自带一些实用的库，有alipay，nanoid，req，xlsxwriter等库，存放在ext目录，需要手动安装，安装方法：在终端进入对应的库目录，运行`luarocks make`。
+## 自带库安装
+
+目前只有lua库，放在ext目录下。
+需要手动安装，安装方法：在终端进入对应的库目录，运行`luarocks make`。
 
 ### 准备开发的库
 

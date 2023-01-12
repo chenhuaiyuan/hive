@@ -90,11 +90,11 @@ impl LuaUserData for LuaRequest {
                 let param_value = param.get(&param_key);
                 if let Some(LuaValue::Table(value)) = param_value {
                     let temp_table = generate_table(lua, value.clone(), fields, val)?;
-                    param.insert(param_key.to_string(), LuaValue::Table(temp_table));
+                    param.insert(param_key, LuaValue::Table(temp_table));
                 } else {
                     let temp = lua.create_table()?;
                     let temp_table = generate_table(lua, temp, fields, val)?;
-                    param.insert(param_key.to_string(), LuaValue::Table(temp_table));
+                    param.insert(param_key, LuaValue::Table(temp_table));
                 }
                 Ok(param)
             };
