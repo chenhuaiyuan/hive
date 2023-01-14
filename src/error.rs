@@ -14,6 +14,8 @@ use std::io::Error as IoError;
 use std::net::AddrParseError;
 use std::path::StripPrefixError;
 use std::string::FromUtf8Error;
+#[cfg(feature = "js")]
+use v8::DataError as V8DataError;
 use zip::result::ZipError;
 
 #[derive(Debug)]
@@ -130,6 +132,13 @@ impl From<MulterError> for Error {
 
 impl From<FromUtf8Error> for Error {
     fn from(value: FromUtf8Error) -> Self {
+        Self::new(2007, value.to_string())
+    }
+}
+
+#[cfg(feature = "js")]
+impl From<V8DataError> for Error {
+    fn from(value: V8DataError) -> Self {
         Self::new(2007, value.to_string())
     }
 }

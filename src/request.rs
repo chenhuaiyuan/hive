@@ -38,11 +38,11 @@ fn has_content_type(headers: &HeaderMap, expected_content_type: &mime::Mime) -> 
 }
 
 impl Request {
-    pub async fn params<T, F1, F2>(self, f1: F1, f2: F2) -> Result<HttpData<T>>
+    pub async fn params<T, F1, F2>(self, mut f1: F1, mut f2: F2) -> Result<HttpData<T>>
     where
         T: Clone,
-        F1: Fn(HttpData<T>, String, Vec<String>, String) -> Result<HttpData<T>>,
-        F2: Fn(HttpData<T>, String, String) -> Result<HttpData<T>>,
+        F1: FnMut(HttpData<T>, String, Vec<String>, String) -> Result<HttpData<T>>,
+        F2: FnMut(HttpData<T>, String, String) -> Result<HttpData<T>>,
     {
         let mut param: HttpData<T> = HashMap::new();
         if self.req.method() == Method::GET {
