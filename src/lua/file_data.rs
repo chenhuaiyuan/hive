@@ -1,4 +1,4 @@
-use crate::file_data::FileDataTrait;
+// use crate::file_data::FileDataTrait;
 use std::ffi::OsStr;
 use std::path::Path;
 use std::sync::Arc;
@@ -32,8 +32,9 @@ impl FileData {
     }
 }
 
-impl FileDataTrait for FileData {}
+// impl FileDataTrait for FileData {}
 
+#[cfg(feature = "lua")]
 impl LuaUserData for FileData {
     fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(_fields: &mut F) {
         _fields.add_field_method_get("field_name", |lua, this| {

@@ -64,7 +64,7 @@ pub struct Args {
 }
 
 #[cfg(feature = "lua")]
-fn lua_run(args: Args) {
+fn lua_run(args: Args) -> WebResult<()> {
     let lua;
     unsafe {
         lua = Arc::new(Lua::unsafe_new());
@@ -124,43 +124,43 @@ fn lua_run(args: Args) {
             local.run_until(server).await.unwrap();
         });
     }
+    Ok(())
 }
 
 #[cfg(feature = "js")]
 fn v8_run(args: Args) {
-    use v8::{Context, ContextScope, HandleScope, Isolate, Script, String, TryCatch, V8};
+    // use v8::{Context, ContextScope, HandleScope, Isolate, Script, String, TryCatch, V8};
 
-    use crate::js::server::create_server;
+    // use crate::js::server::create_server;
 
-    let platform = v8::new_default_platform(0, false).make_shared();
-    V8::initialize_platform(platform);
-    V8::initialize();
+    // let platform = v8::new_default_platform(0, false).make_shared();
+    // V8::initialize_platform(platform);
+    // V8::initialize();
 
-    {
-        let isolate = &mut Isolate::new(Default::default());
-        let scope = &mut HandleScope::new(isolate);
+    // {
+    //     let code = fs::read_to_string(args.file.clone()).expect("read file failed");
 
-        let context = Context::new(scope);
-        let scope = &mut ContextScope::new(scope, context);
+    //     let isolate = &mut Isolate::new(Default::default());
+    //     let scope = &mut HandleScope::new(isolate);
 
-        let function = create_server(scope);
-        let server_key = v8::String::new(scope, "server").unwrap();
-        let global = context.global(scope);
-        global.set(scope, server_key.into(), function.into());
+    //     let context = Context::new(scope);
+    //     let scope = &mut ContextScope::new(scope, context);
 
-        let file = fs::read_to_string(args.file.clone()).expect("read file failed");
-        let code = String::new(scope, &file).unwrap();
+    //     let function = create_server(scope);
+    //     let server_key = v8::String::new(scope, "server").unwrap();
+    //     let global = context.global(scope);
+    //     global.set(scope, server_key.into(), function.into());
 
-        let script = Script::compile(scope, code, None).unwrap();
-        let result = script.run(scope).unwrap();
-        let result = result.to_string(scope).unwrap();
-        println!("result: {}", result.to_rust_string_lossy(scope));
-    }
+    //     let script = Script::compile(scope, code, None).unwrap();
+    //     let result = script.run(scope).unwrap();
+    //     let result = result.to_string(scope).unwrap();
+    //     println!("result: {}", result.to_rust_string_lossy(scope));
+    // }
 
-    unsafe {
-        V8::dispose();
-    }
-    V8::dispose_platform();
+    // unsafe {
+    //     V8::dispose();
+    // }
+    // V8::dispose_platform();
 }
 
 fn main() -> WebResult<()> {
@@ -187,15 +187,16 @@ fn main() -> WebResult<()> {
     log::info!("app start...");
 
     #[cfg(feature = "lua")]
-    lua_run(args);
+    lua_run(args)?;
     #[cfg(feature = "js")]
-    v8_run(args);
+    v8_run(args)?;
     Ok(())
 }
 
+#[cfg(feature = "lua")]
 #[derive(Clone, Copy, Debug)]
 struct LocalExec;
-
+#[cfg(feature = "lua")]
 impl<F> hyper::rt::Executor<F> for LocalExec
 where
     F: std::future::Future + 'static, // not requiring `Send`

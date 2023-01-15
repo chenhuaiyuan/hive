@@ -1,10 +1,8 @@
 use crate::error::{Error as WebError, Result};
-#[cfg(feature = "lua")]
-use crate::file_data::FileDataTrait;
+// #[cfg(feature = "lua")]
+// use crate::file_data::FileDataTrait;
 #[cfg(feature = "lua")]
 use crate::lua::file_data::FileData;
-#[cfg(feature = "lua")]
-use http::CONTENT_TYPE;
 use http::{
     header::{self},
     HeaderMap, Method,
@@ -135,7 +133,7 @@ impl Request {
         let boundary = self
             .req
             .headers()
-            .get(CONTENT_TYPE)
+            .get(header::CONTENT_TYPE)
             .and_then(|ct| ct.to_str().ok())
             .and_then(|ct| multer::parse_boundary(ct).ok());
 

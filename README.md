@@ -34,7 +34,7 @@ cd hive
 cargo install --path . # 在本地安装hive软件，但默认不开启websocket功能，如需要使用websocket，请运行下面命令行
 cargo install --path . --features "lua ws"
 
-# js
+# js 此功能还未完成，请不要运行以下命令
 # 使用v8运行时
 bash download_macos_rusty_v8.sh
 # 如果不是macos系统，可通过自己系统下载对应的librusty_v8.a，可以加快编译速度
