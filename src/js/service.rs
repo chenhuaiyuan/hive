@@ -22,7 +22,7 @@
 
 // use super::server::create_server;
 
-// pub struct Svc(SocketAddr, v8::Global<v8::String>);
+// pub struct Svc(Arc<v8::Isolate>, SocketAddr, v8::Global<v8::String>);
 
 // impl Service<Request<Body>> for Svc {
 //     type Response = Response<Body>;
@@ -34,7 +34,6 @@
 //     }
 
 //     fn call(&mut self, req: Request<Body>) -> Self::Future {
-
 //         let method = req.method().as_str().to_string();
 //         let path = req.uri().path().to_string();
 //         let js_req = JsRequest::new(req, self.1);
@@ -45,6 +44,15 @@
 //             path
 //         );
 //         Box::pin(async move {
+//             let scope = &mut v8::HandleScope::new(isolate);
+//             let context = v8::Context::new(scope);
+//             let scope = &mut v8::ContextScope::new(scope, context);
+
+//             let function = create_server(scope);
+//             let server_key = v8::String::new(scope, "server").unwrap();
+//             let global = context.global(scope);
+//             global.set(scope, server_key.into(), function.into());
+
 //             let handle_str = v8::String::new(&mut scope, "serve").unwrap();
 //             let handle = self.2.get(&mut scope, handle_str.into());
 //             let recv = v8::undefined(*scope);
@@ -87,7 +95,7 @@
 //     }
 // }
 
-// pub struct MakeSvc(pub String);
+// pub struct MakeSvc(pub Arc<v8::Isolate>, pub v8::Global<v8::String>);
 
 // impl Service<&AddrStream> for MakeSvc {
 //     type Response = Svc;
@@ -101,19 +109,7 @@
 //     fn call(&mut self, stream: &AddrStream) -> Self::Future {
 //         let remote_addr = stream.remote_addr();
 
-//         let isolate = &mut v8::Isolate::new(Default::default());
-//         let scope = &mut v8::HandleScope::new(isolate);
-
-//         let context = v8::Context::new(scope);
-//         let scope = &mut v8::ContextScope::new(scope, context);
-//         let function = create_server(scope);
-//         let server_key = v8::String::new(scope, "server").unwrap();
-//         let global = context.global(scope);
-//         global.set(scope, server_key.into(), function.into());
-
-//         let code = v8::String::new(scope, &self.0).unwrap();
-//         let source = v8::Global::new(scope, code);
-//         Box::pin(async move { Ok(Svc(remote_addr, source)) })
+//         Box::pin(async move { Ok(Svc(this.0, remote_addr, this.1)) })
 //     }
 // }
 

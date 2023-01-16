@@ -128,39 +128,34 @@ fn lua_run(args: Args) -> WebResult<()> {
 }
 
 #[cfg(feature = "js")]
-fn v8_run(args: Args) {
+fn v8_run(args: Args) -> WebResult<()> {
     // use v8::{Context, ContextScope, HandleScope, Isolate, Script, String, TryCatch, V8};
 
     // use crate::js::server::create_server;
 
     // let platform = v8::new_default_platform(0, false).make_shared();
-    // V8::initialize_platform(platform);
-    // V8::initialize();
+    // v8::V8::initialize_platform(platform);
+    // v8::V8::initialize();
 
     // {
+    //     let isolate = &mut v8::Isolate::new(Default::default());
+    //     let scope = &mut v8::HandleScope::new(isolate);
+
     //     let code = fs::read_to_string(args.file.clone()).expect("read file failed");
+    //     let code = v8::String::new(scope, &code).unwrap();
+    //     let source = v8::Global::new(scope, code);
 
-    //     let isolate = &mut Isolate::new(Default::default());
-    //     let scope = &mut HandleScope::new(isolate);
-
-    //     let context = Context::new(scope);
-    //     let scope = &mut ContextScope::new(scope, context);
-
-    //     let function = create_server(scope);
-    //     let server_key = v8::String::new(scope, "server").unwrap();
-    //     let global = context.global(scope);
-    //     global.set(scope, server_key.into(), function.into());
-
-    //     let script = Script::compile(scope, code, None).unwrap();
+    //     let script = v8::Script::compile(scope, code, None).unwrap();
     //     let result = script.run(scope).unwrap();
     //     let result = result.to_string(scope).unwrap();
     //     println!("result: {}", result.to_rust_string_lossy(scope));
     // }
 
     // unsafe {
-    //     V8::dispose();
+    //     v8::V8::dispose();
     // }
-    // V8::dispose_platform();
+    // v8::V8::dispose_platform();
+    Ok(())
 }
 
 fn main() -> WebResult<()> {
