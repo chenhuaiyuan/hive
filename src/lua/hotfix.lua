@@ -95,7 +95,7 @@ local function hotfix(filename)
   end
 
   print("replaced succeed")
-  package.loaded[filename] = oldModule
+  -- package.loaded[filename] = oldModule
 end
 
 return hotfix
