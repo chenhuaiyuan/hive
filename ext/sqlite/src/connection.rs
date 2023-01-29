@@ -71,6 +71,28 @@ impl LuaUserData for SqliteConnection {
                 Ok(table)
             },
         );
+        _methods.add_method_mut(
+            "query_first",
+            |lua, this, (sql, params, query_field): (String, LuaTable, LuaTable)| {
+                let params = table_to_params(params)?;
+                let params = params_from_iter(params);
+                let mut stmt = this.0.prepare(&sql).to_lua_err()?;
+                let table = stmt
+                    .query_row(params, |row| {
+                        let table = lua.create_table().unwrap();
+                        for pair in query_field.pairs::<LuaValue, String>() {
+                            let (_, field) = pair.unwrap();
+                            let data: SqliteValue = row.get(field.as_str())?;
+                            let data = sqlite_value_to_lua_value(lua, data).unwrap();
+                            table.set(field, data).unwrap();
+                        }
+                        Ok(table)
+                    })
+                    .to_lua_err()?;
+
+                Ok(table)
+            },
+        );
         _methods.add_method_mut("insert", |_, this, (sql, params): (String, LuaTable)| {
             let params = table_to_params(params)?;
             let params = params_from_iter(params);
