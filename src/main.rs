@@ -61,6 +61,21 @@ pub struct Args {
     /// release环境下热重载，此功能还未实现
     #[arg(long, default_value_t = false)]
     reload: bool,
+    /// 自定义参数,多个参数之间用“&”分割，例如：aaa=123&b=456
+    #[arg(long)]
+    custom_params: Option<String>,
+}
+
+// 自定义参数处理
+// 例如：a=123&b=456
+fn custom_params_parse(lua: &Lua, params: String) -> LuaResult<LuaTable> {
+    let table = lua.create_table()?;
+    let params: Vec<&str> = params.split('&').collect();
+    for param in params {
+        let p: Vec<&str> = param.split('=').collect();
+        table.set(p[0], p[1])?;
+    }
+    Ok(table)
 }
 
 #[cfg(feature = "lua")]
@@ -79,9 +94,14 @@ fn lua_run(args: Args) -> WebResult<()> {
     hive.set("table_to_json", create_table_to_json_string(&lua)?)?;
     #[cfg(feature = "lua")]
     hive.set("file_data", lua.create_proxy::<FileData>()?)?;
-
     hive.set("web_error", create_error(&lua)?)?;
-    hive.set("env", lua.create_table_from([("dev", args.dev)])?)?;
+    if let Some(ref custom_params) = args.custom_params {
+        let env = custom_params_parse(&lua, custom_params.clone())?;
+        env.set("dev", args.dev)?;
+        hive.set("env", env)?;
+    } else {
+        hive.set("env", lua.create_table_from([("dev", args.dev)])?)?;
+    }
     hive.set("version", lua.create_string(env!("CARGO_PKG_VERSION"))?)?;
     hive.set("server", create_server(&lua)?)?;
     #[cfg(feature = "ws")]
