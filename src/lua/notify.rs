@@ -32,7 +32,7 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
 
     let mut current_dir = env::current_dir().expect("Failed to determine current directory");
     if args.watch_dir != "." {
-        current_dir.push(args.watch_dir);
+        current_dir.push(args.watch_dir.clone());
     }
     watcher.watch(&current_dir, RecursiveMode::Recursive)?;
 
@@ -49,7 +49,15 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
                             let file = file.replace('/', ".");
                             let data = file.rsplit_once('.');
                             if let Some((mode, _)) = data {
-                                hotfix.call::<_, ()>(mode)?;
+                                let mut m;
+                                if args.watch_dir != "." {
+                                    let watch_dir = args.watch_dir.clone().replace('/', ".");
+                                    m = watch_dir + ".";
+                                    m += mode;
+                                } else {
+                                    m = mode.to_string();
+                                }
+                                hotfix.call::<_, ()>(m)?;
                                 let file = tokio::fs::read(args.file.clone()).await?;
 
                                 let handler: LuaTable = lua.load(&file).eval()?;
