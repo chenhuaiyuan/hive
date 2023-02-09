@@ -192,7 +192,7 @@ fn main() -> WebResult<()> {
         create_object(object_name)?;
         return Ok(());
     } else {
-        fast_log::init(Config::new().console().file_split(
+        fast_log::init(Config::new().file_split(
             "logs/",
             LogSize::MB(50),
             RollingType::KeepNum(5),
