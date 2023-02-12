@@ -1,4 +1,6 @@
 pub mod lua_request;
+// pub mod mysql_sqlx;
+pub mod mysql_async;
 pub mod notify;
 pub mod server;
 pub mod service;
