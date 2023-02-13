@@ -83,6 +83,8 @@ fn custom_params_parse(lua: &Lua, params: String) -> LuaResult<LuaTable> {
 
 #[cfg(feature = "lua")]
 async fn lua_run(args: Args) -> WebResult<()> {
+    use crate::lua::router::create_router;
+
     let lua;
     unsafe {
         lua = Arc::new(Lua::unsafe_new());
@@ -108,6 +110,7 @@ async fn lua_run(args: Args) -> WebResult<()> {
     #[cfg(feature = "ws")]
     hive.set("ws_message", create_message(&lua)?)?;
     hive.set("mysql", create_mysql(&lua)?)?;
+    hive.set("router", create_router(&lua)?)?;
     globals.set("hive", hive)?;
 
     let file = fs::read(args.file.clone()).expect("read file failed");

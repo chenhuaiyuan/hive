@@ -1,7 +1,8 @@
 -- local auth_token = require 'middleware.auth_token'
 local test = require 'controllers.test'
-local r = require 'router'
-local router = r.new()
+-- local r = require 'router'
+-- local router = r.new()
+local router = hive.router.new()
 
 
 router:match('get', '/', test.index)

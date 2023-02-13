@@ -16,12 +16,13 @@ local router = require 'route'
 local function exec(method, path, req)
   local remote_addr = req:remote_addr()
   local headers = req:headers()
-  local bool, func, middleware, params = router:execute(method, path,
-    { _request = req, _remote_addr = remote_addr, _headers = headers })
-  if bool then
-    if middleware then
+  local params = { _request = req, _remote_addr = remote_addr, _headers = headers }
+  local handler = router:execute(method, path)
+  if handler.is_exist then
+    params.router_params = handler.router_params
+    if handler.middleware ~= nil then
       local is_pass = false;
-      is_pass, params._user_info = middleware(req)
+      is_pass, params._user_info = handler.middleware(req)
       if not is_pass then
         local res = { code = 5001, message = 'Failed to verify token', data = '' }
         return {
@@ -33,7 +34,7 @@ local function exec(method, path, req)
         }
       end
     end
-    return func(params)
+    return handler.func(params)
   else
     return {
       ['status'] = 404,

@@ -61,3 +61,5 @@ async-trait = "0.1"
 
 mysql_async = {version = "0.31.2", optional = true}
 dateparser = {version = "0.1.7", optional = true}
+
+matchit = "0.7.0"
