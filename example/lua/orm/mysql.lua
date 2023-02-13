@@ -1,9 +1,9 @@
-local mysql = require 'mysql'
+-- local mysql = require 'mysql'
 
 local _mysql = {}
 -- local p = require 'utils.print_table'
 
-local operator = { "=", ">", "<", ">=", "<=", "!=", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP", "RLIKE",
+local OPERATOR = { "=", ">", "<", ">=", "<=", "!=", "LIKE", "NOT LIKE", "REGEXP", "NOT REGEXP", "RLIKE",
   "NOT RLIKE" }
 
 ---数组合并
@@ -20,8 +20,8 @@ end
 ---判断是否包含
 ---@param oper string
 ---@return boolean
-function operator.contain(oper)
-  for _, v in pairs(operator) do
+function OPERATOR.contain(oper)
+  for _, v in pairs(OPERATOR) do
     if type(v) == 'string' and v == oper:upper() then
       return true
     end
@@ -29,8 +29,12 @@ function operator.contain(oper)
   return false
 end
 
-function _mysql.new(user, pass, host)
-  _MYSQL = mysql.new(user or MYSQL_USER, pass or MYSQL_PASS, host or MYSQL_HOST)
+function _mysql.new(user, pass, host, database)
+  if database ~= nil then
+    _MYSQL = hive.mysql.new(user or MYSQL_USER, pass or MYSQL_PASS, host or MYSQL_HOST, database)
+  else
+    _MYSQL = hive.mysql.new(user or MYSQL_USER, pass or MYSQL_PASS, host or MYSQL_HOST)
+  end
 end
 
 ---数据库
@@ -173,7 +177,7 @@ function _mysql:where_in(key, values)
   if self._wheres.fields == nil then self._wheres.fields = {} end
   if self._wheres.data == nil then self._wheres.data = {} end
   if type(values) ~= 'table' then
-    error('where_in function parameter must be table')
+    return hive.web_error(3003, 'where_in function parameter must be table')
   end
   if #(self._wheres.fields) == 0 then
     if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil then
@@ -220,7 +224,7 @@ function _mysql:or_where_in(key, values)
   if self._wheres.fields == nil then self._wheres.fields = {} end
   if self._wheres.data == nil then self._wheres.data = {} end
   if type(values) ~= 'table' then
-    error('or_where_in function parameter must be table')
+    return hive.web_error(3004, 'or_where_in function parameter must be table')
   end
   if #(self._wheres.fields) == 0 then
     if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil then
@@ -266,7 +270,7 @@ function _mysql:where_not_in(key, values)
   if self._wheres.fields == nil then self._wheres.fields = {} end
   if self._wheres.data == nil then self._wheres.data = {} end
   if type(values) ~= 'table' then
-    error('where_not_in function parameter must be table')
+    return hive.web_error(3005, 'where_not_in function parameter must be table')
   end
   if #(self._wheres.fields) == 0 then
     if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil then
@@ -313,7 +317,7 @@ function _mysql:or_where_not_in(key, values)
   if self._wheres.fields == nil then self._wheres.fields = {} end
   if self._wheres.data == nil then self._wheres.data = {} end
   if type(values) ~= 'table' then
-    error('or_where_not_in function parameter must be table')
+    return hive.web_error(3006, 'or_where_not_in function parameter must be table')
   end
   if #(self._wheres.fields) == 0 then
     if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil then
@@ -446,7 +450,7 @@ end
 
 ---limit offset, count
 ---@param offset number
----@param count number
+---@param count number | nil
 ---@return table
 function _mysql:limit(offset, count)
   if self._limit == nil then self._limit = {} end
@@ -539,17 +543,29 @@ function _mysql:right_join(table2, table1_field, table2_field)
   return self
 end
 
+---交叉联表
+---@param table2 string 表名
+---@return table
+function _mysql:cross_join(table2)
+  if self._cross_join == nil then self._cross_join = {} end
+  table.insert(self._cross_join, {
+    ['table2'] = table2
+  })
+  return self
+end
+
 function _mysql:find()
   local sql = 'SELECT '
   if self._columns ~= nil then
     for _, v in ipairs(self._columns) do
+      -- 带括号的处理，比如：count(*)
       local is_exist = string.find(v, '(', 1, true)
 
       -- 带有()的不做任何处理，比如：count(*)，sum(number)等等
       if is_exist ~= nil then
         sql = sql .. v .. ','
       else
-        if self._inner_join ~= nil or self._left_join ~= nil or self._right_join then
+        if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil or self._cross_join ~= nil then
           sql = sql .. string.format('%s,', v)
         else
           local is_found_as = string.find(v, 'as', 1, true)
@@ -566,7 +582,7 @@ function _mysql:find()
     sql = sql .. '*'
   end
 
-  if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil then
+  if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil or self._cross_join ~= nil then
     sql = sql .. string.format(' FROM `%s`.%s ', self._database, self._table)
     if self._inner_join ~= nil then
       for _, v in ipairs(self._inner_join) do
@@ -581,6 +597,10 @@ function _mysql:find()
             string.format('LEFT JOIN `%s`.%s ON %s = %s ', self._database, v.table2,
               v.table1_field,
               v.table2_field)
+      end
+    elseif self._cross_join ~= nil then
+      for _, v in ipairs(self._cross_join) do
+        sql = sql .. string.format('CROSS JOIN `%s`.%s ', self._database, v.table2)
       end
     else
       for _, v in ipairs(self._right_join) do
@@ -619,6 +639,20 @@ function _mysql:find()
   return data
 end
 
+---执行原始sql
+---@param sql string
+---@param params table | nil
+function _mysql.exec_first(sql, params)
+  return _MYSQL:exec_first(sql, params)
+end
+
+---执行原始sql
+---@param sql string
+---@param params table | nil
+function _mysql.exec(sql, params)
+  return _MYSQL:exec(sql, params)
+end
+
 function _mysql:find_all()
   local sql = 'SELECT '
   if self._columns ~= nil then
@@ -629,7 +663,7 @@ function _mysql:find_all()
       if is_exist ~= nil then
         sql = sql .. v .. ','
       else
-        if self._inner_join ~= nil or self._left_join ~= nil or self._right_join then
+        if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil or self._cross_join ~= nil then
           sql = sql .. string.format('%s,', v)
         else
           local is_found_as = string.find(v, 'as', 1, true)
@@ -646,7 +680,7 @@ function _mysql:find_all()
     sql = sql .. '*'
   end
 
-  if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil then
+  if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil or self._cross_join ~= nil then
     sql = sql .. string.format(' FROM `%s`.%s ', self._database, self._table)
     if self._inner_join ~= nil then
       for _, v in ipairs(self._inner_join) do
@@ -661,6 +695,10 @@ function _mysql:find_all()
             string.format('LEFT JOIN `%s`.%s ON %s = %s ', self._database, v.table2,
               v.table1_field,
               v.table2_field)
+      end
+    elseif self._cross_join ~= nil then
+      for _, v in ipairs(self._cross_join) do
+        sql = sql .. string.format('CROSS JOIN `%s`.%s ', self._database, v.table2)
       end
     else
       for _, v in ipairs(self._right_join) do
@@ -860,7 +898,7 @@ end
 
 function _mysql:count()
   local sql = ''
-  if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil then
+  if self._inner_join ~= nil or self._left_join ~= nil or self._right_join ~= nil or self._cross_join ~= nil then
     sql = string.format('SELECT COUNT(*) as count FROM `%s`.%s ', self._database, self._table)
   else
     sql = string.format('SELECT COUNT(*) as count FROM `%s`.`%s` ', self._database, self._table)
@@ -886,6 +924,10 @@ function _mysql:count()
           string.format('RIGHT JOIN `%s`.%s ON %s = %s ', self._database, v.table2,
             v.table1_field,
             v.table2_field)
+    end
+  elseif self._cross_join ~= nil then
+    for _, v in ipairs(self._cross_join) do
+      sql = sql .. string.format('CROSS JOIN `%s`.%s ', self._database, v.table2)
     end
   end
 
