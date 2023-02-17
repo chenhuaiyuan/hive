@@ -3,6 +3,7 @@ use crate::error::Error as WebError;
 #[cfg(feature = "ws")]
 use crate::lua::websocket::handle_connection;
 use crate::request::{HttpData, Request};
+use hive_base::json_value_to_lua_value;
 #[cfg(feature = "ws")]
 use http::header::{
     CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE,
@@ -13,6 +14,7 @@ use http::Method;
 use http::{HeaderValue, StatusCode, Version};
 use hyper::{Body, Request as HyperRequest};
 use mlua::prelude::*;
+use serde_json::Value as JsonValue;
 use std::net::SocketAddr;
 #[cfg(feature = "ws")]
 use std::sync::Arc;
@@ -31,11 +33,12 @@ impl LuaRequest {
     }
 }
 
+// 用于处理多维数组
 fn generate_table<'lua>(
     lua: &Lua,
     tab: LuaTable<'lua>,
     mut cap: Vec<String>,
-    val: String,
+    val: JsonValue,
 ) -> LuaResult<LuaTable<'lua>> {
     if cap.is_empty() {
         return Ok(tab);
@@ -46,8 +49,9 @@ fn generate_table<'lua>(
     if let Ok(idx) = num {
         let i = idx + 1;
         if len == 0 {
-            tab.set(i, val)?;
-            generate_table(lua, tab, cap, "".to_owned())
+            let v = json_value_to_lua_value(lua, val)?;
+            tab.set(i, v)?;
+            generate_table(lua, tab, cap, JsonValue::Null)
         } else {
             let table: LuaResult<LuaTable> = tab.get(i);
             if let Ok(t) = table {
@@ -62,8 +66,9 @@ fn generate_table<'lua>(
             }
         }
     } else if len == 0 {
-        tab.set(index, val)?;
-        generate_table(lua, tab, cap, "".to_owned())
+        let v = json_value_to_lua_value(lua, val)?;
+        tab.set(index, v)?;
+        generate_table(lua, tab, cap, JsonValue::Null)
     } else {
         let table: LuaResult<LuaTable> = tab.get(index.clone());
         if let Ok(t) = table {
@@ -98,8 +103,9 @@ impl LuaUserData for LuaRequest {
                 }
                 Ok(param)
             };
-            let f2 = |mut param: HttpData<LuaValue<'lua>>, key, val: String| {
-                param.insert(key, LuaValue::String(lua.create_string(&val)?));
+            let f2 = |mut param: HttpData<LuaValue<'lua>>, key, val| {
+                let val = json_value_to_lua_value(lua, val)?;
+                param.insert(key, val);
                 Ok(param)
             };
             let params = this.0.params(f1, f2).await.to_lua_err()?;
@@ -138,7 +144,8 @@ impl LuaUserData for LuaRequest {
                 Ok(param)
             };
             let f2 = |mut param: HttpData<LuaValue<'lua>>, field_name, data| {
-                param.insert(field_name, LuaValue::String(lua.create_string(&data)?));
+                let data = json_value_to_lua_value(lua, data)?;
+                param.insert(field_name, data);
                 Ok(param)
             };
             let params = this.0.form(file_func, f1, f2).await.to_lua_err()?;

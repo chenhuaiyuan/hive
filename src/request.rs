@@ -10,6 +10,7 @@ use http::{
 use hyper::{Body, Request as HyperRequest};
 #[cfg(feature = "lua")]
 use multer::Multipart;
+use serde_json::Value as JsonValue;
 use std::{collections::HashMap, net::SocketAddr};
 
 pub struct Request {
@@ -39,13 +40,13 @@ impl Request {
     pub async fn params<T, F1, F2>(self, mut f1: F1, mut f2: F2) -> Result<HttpData<T>>
     where
         T: Clone,
-        F1: FnMut(HttpData<T>, String, Vec<String>, String) -> Result<HttpData<T>>,
-        F2: FnMut(HttpData<T>, String, String) -> Result<HttpData<T>>,
+        F1: FnMut(HttpData<T>, String, Vec<String>, JsonValue) -> Result<HttpData<T>>, // 用于处理多维数组参数
+        F2: FnMut(HttpData<T>, String, JsonValue) -> Result<HttpData<T>>, // 用于处理正常参数
     {
         let mut param: HttpData<T> = HashMap::new();
         if self.req.method() == Method::GET {
             let query = self.req.uri().query().unwrap_or_default();
-            let value = serde_urlencoded::from_str::<Vec<(String, String)>>(query)
+            let value = serde_urlencoded::from_str::<Vec<(String, JsonValue)>>(query)
                 .map_err(WebError::parse_params)?;
 
             for (key, val) in value {
@@ -82,7 +83,7 @@ impl Request {
                 return Ok(param);
             }
             let bytes = hyper::body::to_bytes(self.req).await?;
-            let value = serde_urlencoded::from_bytes::<Vec<(String, String)>>(&bytes)
+            let value = serde_urlencoded::from_bytes::<Vec<(String, JsonValue)>>(&bytes)
                 .map_err(WebError::parse_params)?;
 
             for (key, val) in value {
@@ -118,13 +119,12 @@ impl Request {
         Ok(param)
     }
 
-    #[cfg(feature = "lua")]
     pub async fn form<T, F1, F2, F3>(self, file_func: F1, f1: F2, f2: F3) -> Result<HttpData<T>>
     where
         T: Clone,
         F1: Fn(HttpData<T>, String, FileData) -> Result<HttpData<T>>,
-        F2: Fn(HttpData<T>, String, Vec<String>, String) -> Result<HttpData<T>>,
-        F3: Fn(HttpData<T>, String, String) -> Result<HttpData<T>>,
+        F2: Fn(HttpData<T>, String, Vec<String>, JsonValue) -> Result<HttpData<T>>,
+        F3: Fn(HttpData<T>, String, JsonValue) -> Result<HttpData<T>>,
     {
         let mut param: HttpData<T> = HttpData::new();
         if !has_content_type(self.req.headers(), &mime::MULTIPART_FORM_DATA) {
@@ -163,7 +163,8 @@ impl Request {
                 let file = FileData::new(field_name.clone(), file_name, content_type, field_data);
                 param = file_func(param, field_name, file)?;
             } else if let Some(field_name) = name.clone() {
-                let data = String::from_utf8(field_data)?;
+                // let data = String::from_utf8(field_data)?;
+                let data = JsonValue::from(field_data);
                 let left_square_bracket = field_name.find('[');
                 if let Some(l) = left_square_bracket {
                     let param_name = field_name.get(0..l);
