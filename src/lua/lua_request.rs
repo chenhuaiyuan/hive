@@ -43,41 +43,41 @@ fn generate_table<'lua>(
     if cap.is_empty() {
         return Ok(tab);
     }
-    let index = cap.remove(0);
-    let len = cap.len();
-    let num = index.parse::<i32>();
+    let index: String = cap.remove(0);
+    let len: usize = cap.len();
+    let num: Result<i32, std::num::ParseIntError> = index.parse::<i32>();
     if let Ok(idx) = num {
-        let i = idx + 1;
+        let i: i32 = idx + 1;
         if len == 0 {
-            let v = json_value_to_lua_value(lua, val)?;
+            let v: LuaValue = json_value_to_lua_value(lua, val)?;
             tab.set(i, v)?;
             generate_table(lua, tab, cap, JsonValue::Null)
         } else {
             let table: LuaResult<LuaTable> = tab.get(i);
             if let Ok(t) = table {
-                let temp = generate_table(lua, t, cap, val)?;
+                let temp: LuaTable = generate_table(lua, t, cap, val)?;
                 tab.set(i, temp)?;
                 Ok(tab)
             } else {
-                let temp_tab = lua.create_table()?;
-                let t = generate_table(lua, temp_tab, cap, val)?;
+                let temp_tab: LuaTable = lua.create_table()?;
+                let t: LuaTable = generate_table(lua, temp_tab, cap, val)?;
                 tab.set(i, t)?;
                 Ok(tab)
             }
         }
     } else if len == 0 {
-        let v = json_value_to_lua_value(lua, val)?;
+        let v: LuaValue = json_value_to_lua_value(lua, val)?;
         tab.set(index, v)?;
         generate_table(lua, tab, cap, JsonValue::Null)
     } else {
         let table: LuaResult<LuaTable> = tab.get(index.clone());
         if let Ok(t) = table {
-            let temp = generate_table(lua, t, cap, val)?;
+            let temp: LuaTable = generate_table(lua, t, cap, val)?;
             tab.set(index, temp)?;
             Ok(tab)
         } else {
-            let temp_tab = lua.create_table()?;
-            let t = generate_table(lua, temp_tab, cap, val)?;
+            let temp_tab: LuaTable = lua.create_table()?;
+            let t: LuaTable = generate_table(lua, temp_tab, cap, val)?;
             tab.set(index, t)?;
             Ok(tab)
         }
@@ -87,7 +87,7 @@ fn generate_table<'lua>(
 impl LuaUserData for LuaRequest {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
         _methods.add_async_function("params", |lua, this: LuaAnyUserData| async move {
-            let this = this.take::<Self>()?;
+            let this: LuaRequest = this.take::<Self>()?;
             let f1 = |mut param: HttpData<LuaValue<'lua>>,
                       param_key: String,
                       fields: Vec<String>,
@@ -108,7 +108,8 @@ impl LuaUserData for LuaRequest {
                 param.insert(key, val);
                 Ok(param)
             };
-            let params = this.0.params(f1, f2).await.to_lua_err()?;
+            let params: std::collections::HashMap<String, LuaValue> =
+                this.0.params(f1, f2).await.to_lua_err()?;
 
             Ok(params)
         });
@@ -116,17 +117,17 @@ impl LuaUserData for LuaRequest {
             Ok((this.0.remote_addr).to_string())
         });
         _methods.add_method("headers", |lua, this, ()| {
-            let headers = lua.create_table()?;
-            let headers_raw = this.0.req.headers();
+            let headers: LuaTable = lua.create_table()?;
+            let headers_raw: &http::HeaderMap = this.0.req.headers();
             for (key, val) in headers_raw {
-                let key = key.as_str().to_string();
-                let val = val.to_str().to_lua_err()?.to_string();
+                let key: String = key.as_str().to_string();
+                let val: String = val.to_str().to_lua_err()?.to_string();
                 headers.set(key, val)?;
             }
             Ok(headers)
         });
         _methods.add_async_function("form", |lua, this: LuaAnyUserData| async move {
-            let this = this.take::<Self>()?;
+            let this: LuaRequest = this.take::<Self>()?;
             let file_func = |mut param: HttpData<LuaValue<'lua>>, field_name, file| {
                 param.insert(field_name, LuaValue::UserData(lua.create_userdata(file)?));
                 Ok(param)
@@ -148,7 +149,8 @@ impl LuaUserData for LuaRequest {
                 param.insert(field_name, data);
                 Ok(param)
             };
-            let params = this.0.form(file_func, f1, f2).await.to_lua_err()?;
+            let params: std::collections::HashMap<String, LuaValue> =
+                this.0.form(file_func, f1, f2).await.to_lua_err()?;
             Ok(params)
         });
         #[cfg(feature = "ws")]

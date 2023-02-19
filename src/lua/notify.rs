@@ -12,7 +12,7 @@ use crate::Args;
 fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
     let (tx, rx) = channel(1);
 
-    let watcher = RecommendedWatcher::new(
+    let watcher: notify::FsEventWatcher = RecommendedWatcher::new(
         move |res| {
             Runtime::new().unwrap().block_on(async {
                 tx.send(res).await.unwrap();
@@ -30,7 +30,8 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
         .eval()?;
     let (mut watcher, mut rx) = async_watcher()?;
 
-    let mut current_dir = env::current_dir().expect("Failed to determine current directory");
+    let mut current_dir: std::path::PathBuf =
+        env::current_dir().expect("Failed to determine current directory");
     if args.watch_dir != "." {
         current_dir.push(args.watch_dir.clone());
     }
@@ -73,7 +74,7 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
                         }
                     }
                 } else {
-                    let file = tokio::fs::read(args.file.clone()).await?;
+                    let file: Vec<u8> = tokio::fs::read(args.file.clone()).await?;
 
                     let handler: LuaTable = lua.load(&file).eval()?;
                     lua.set_named_registry_value(

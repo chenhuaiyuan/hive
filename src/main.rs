@@ -31,17 +31,13 @@ use fast_log::{
     consts::LogSize,
     plugin::{file_split::RollingType, packer::ZipPacker},
 };
-// use futures_util::Future;
 use hyper::Server;
 #[cfg(feature = "lua")]
 use mlua::prelude::*;
-// use once_cell::sync::Lazy;
 use std::fs;
 use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::sync::Arc;
-
-// pub static HALF_NUM_CPUS: Lazy<usize> = Lazy::new(|| 1.max(num_cpus::get() / 2));
 
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
@@ -85,15 +81,12 @@ fn custom_params_parse(lua: &Lua, params: String) -> LuaResult<LuaTable> {
 async fn lua_run(args: Args) -> WebResult<()> {
     use crate::lua::router::create_router;
 
-    let lua;
-    unsafe {
-        lua = Arc::new(Lua::unsafe_new());
-    }
+    let lua: Arc<Lua> = unsafe { Arc::new(Lua::unsafe_new()) };
 
     let lua_clone = lua.clone();
-    let globals = lua_clone.globals();
+    let globals: LuaTable = lua_clone.globals();
 
-    let hive = lua.create_table()?;
+    let hive: LuaTable = lua.create_table()?;
 
     hive.set("table_to_json", create_table_to_json_string(&lua)?)?;
     hive.set("file_data", lua.create_proxy::<FileData>()?)?;
@@ -113,14 +106,14 @@ async fn lua_run(args: Args) -> WebResult<()> {
     hive.set("router", create_router(&lua)?)?;
     globals.set("hive", hive)?;
 
-    let file = fs::read(args.file.clone()).expect("read file failed");
+    let file: Vec<u8> = fs::read(args.file.clone()).expect("read file failed");
 
     let handler: LuaTable = lua.load(&file).eval_async().await?;
 
     let is_ipv4: bool = handler.get("is_ipv4").unwrap_or(true);
     let localhost: String = handler.get("addr").unwrap_or("127.0.0.1".to_owned());
     let port: u16 = handler.get("port").unwrap_or(3000);
-    let addr = if is_ipv4 {
+    let addr: SocketAddr = if is_ipv4 {
         SocketAddr::new(IpAddr::V4(localhost.parse()?), port)
     } else {
         SocketAddr::new(IpAddr::V6(localhost.parse()?), port)
@@ -129,17 +122,6 @@ async fn lua_run(args: Args) -> WebResult<()> {
     lua.set_named_registry_value("http_handler", handler.get::<_, LuaFunction>("serve")?)?;
     lua.set_named_registry_value("exception", handler.get::<_, LuaFunction>("exception")?)?;
     if args.dev {
-        // block_on(async {
-        //     let server = Server::bind(&addr)
-        //         .executor(LocalExec)
-        //         .serve(MakeSvc(lua.clone()));
-        //     let local = tokio::task::LocalSet::new();
-        //     let j = tokio::join! {
-        //         async_watch(lua.clone(), args.clone()),
-        //         local.run_until(server)
-        //     };
-        //     j.0.unwrap();
-        // });
         let server = Server::bind(&addr)
             .executor(LocalExec)
             .serve(MakeSvc(lua.clone()));
@@ -150,13 +132,6 @@ async fn lua_run(args: Args) -> WebResult<()> {
         };
         j.0.unwrap();
     } else {
-        // block_on(async {
-        //     let server = Server::bind(&addr)
-        //         .executor(LocalExec)
-        //         .serve(MakeSvc(lua.clone()));
-        //     let local = tokio::task::LocalSet::new();
-        //     local.run_until(server).await.unwrap();
-        // });
         let server = Server::bind(&addr)
             .executor(LocalExec)
             .serve(MakeSvc(lua.clone()));
@@ -240,12 +215,3 @@ where
         tokio::task::spawn_local(fut);
     }
 }
-
-// fn block_on<F: Future>(f: F) -> F::Output {
-//     tokio::runtime::Builder::new_multi_thread()
-//         .enable_all()
-//         .worker_threads(*HALF_NUM_CPUS)
-//         .build()
-//         .unwrap()
-//         .block_on(f)
-// }

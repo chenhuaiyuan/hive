@@ -23,10 +23,10 @@ impl Service<Request<Body>> for Svc {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        let lua = self.0.clone();
-        let method = req.method().as_str().to_string();
-        let path = req.uri().path().to_string();
-        let lua_req = LuaRequest::new(req, self.1);
+        let lua: Arc<Lua> = self.0.clone();
+        let method: String = req.method().as_str().to_string();
+        let path: String = req.uri().path().to_string();
+        let lua_req: LuaRequest = LuaRequest::new(req, self.1);
         log::info!(
             "Request -- remote address: {}, method: {}, uri: {}",
             self.1,
@@ -46,13 +46,14 @@ impl Service<Request<Body>> for Svc {
                     LuaValue::Number(v) => Ok(Response::new(Body::from(v.to_string()))),
                     LuaValue::String(v) => Ok(Response::new(Body::from(v.to_str()?.to_string()))),
                     LuaValue::Table(v) => {
-                        let status = v
+                        let status: u16 = v
                             .get::<_, Option<u16>>("status")
                             .to_lua_err()?
                             .unwrap_or(200);
-                        let mut resp = Response::builder().status(status);
+                        let mut resp: http::response::Builder = Response::builder().status(status);
 
-                        let version = v.get::<_, Option<String>>("version").to_lua_err()?;
+                        let version: Option<String> =
+                            v.get::<_, Option<String>>("version").to_lua_err()?;
                         if let Some(ver) = version {
                             if ver == "HTTP/0.9" {
                                 resp = resp.version(Version::HTTP_09);
@@ -114,7 +115,7 @@ impl Service<Request<Body>> for Svc {
                                 }
                             }
 
-                            let body = v
+                            let body: Body = v
                                 .get::<_, Option<LuaString>>("body")
                                 .to_lua_err()?
                                 .map(|b| Body::from(b.as_bytes().to_vec()))

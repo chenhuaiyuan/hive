@@ -55,32 +55,29 @@ impl LuaUserData for FileData {
                     'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
                     'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
                 ];
-                let this = this.take::<Self>()?;
+                let this: FileData = this.take::<Self>()?;
                 if path.is_empty() {
                     let file: Vec<&str> = this.file_name.split('.').collect();
                     if file.len() == 2 {
-                        let suffix = file[1];
+                        let suffix: &str = file[1];
 
-                        let random_name = nanoid!(16, &alphabet) + ".";
+                        let random_name: String = nanoid!(16, &alphabet) + ".";
 
-                        let new_file_name = random_name + suffix;
-                        let mut file =
+                        let new_file_name: String = random_name + suffix;
+                        let mut file: fs::File =
                             fs::File::create(new_file_name.clone()).await.to_lua_err()?;
                         file.write_all(&this.content).await.to_lua_err()?;
-                        // fs::write(new_file_name, this.content.as_ref())
-                        //     .await
-                        //     .to_lua_err()?;
-                        let file_name = lua.create_string(&new_file_name)?;
+                        let file_name: LuaString = lua.create_string(&new_file_name)?;
                         return Ok((true, file_name));
                     }
                     return Ok((false, lua.create_string(&"")?));
                 }
-                let path = path.into_vec();
+                let path: Vec<LuaValue> = path.into_vec();
                 if path.len() == 1 {
                     match path[0].clone() {
                         LuaValue::String(v) => {
-                            let mut p = v.to_str()?.to_string();
-                            let last_char = p.pop().unwrap_or('/');
+                            let mut p: String = v.to_str()?.to_string();
+                            let last_char: char = p.pop().unwrap_or('/');
                             if last_char == '/' {
                                 p.push('/');
                             } else {
@@ -88,26 +85,23 @@ impl LuaUserData for FileData {
                                 p.push('/');
                             }
 
-                            let dir = Path::new(&p);
+                            let dir: &Path = Path::new(&p);
 
                             if !dir.exists() {
                                 fs::create_dir_all(dir).await.to_lua_err()?;
                             }
 
                             let file: Vec<&str> = this.file_name.split('.').collect();
-                            let suffix = file[1];
+                            let suffix: &str = file[1];
 
-                            let random_name = nanoid!(16, &alphabet) + ".";
+                            let random_name: String = nanoid!(16, &alphabet) + ".";
 
-                            let new_file_name = dir.join(random_name + suffix);
-                            let mut file =
+                            let new_file_name: std::path::PathBuf = dir.join(random_name + suffix);
+                            let mut file: fs::File =
                                 fs::File::create(new_file_name.clone()).await.to_lua_err()?;
                             file.write_all(&this.content).await.to_lua_err()?;
-                            // fs::write(new_file_name, this.content.as_ref())
-                            //     .await
-                            //     .to_lua_err()?;
-                            let f_name = new_file_name.to_str().unwrap_or("");
-                            let file_name = lua.create_string(&f_name)?;
+                            let f_name: &str = new_file_name.to_str().unwrap_or("");
+                            let file_name: LuaString = lua.create_string(&f_name)?;
                             return Ok((true, file_name));
                         }
                         _ => {
@@ -117,8 +111,8 @@ impl LuaUserData for FileData {
                 } else if path.len() >= 2 {
                     match path[0].clone() {
                         LuaValue::String(v) => {
-                            let mut p = v.to_str()?.to_string();
-                            let last_char = p.pop().unwrap_or('/');
+                            let mut p: String = v.to_str()?.to_string();
+                            let last_char: char = p.pop().unwrap_or('/');
                             if last_char == '/' {
                                 p.push('/');
                             } else {
@@ -126,7 +120,7 @@ impl LuaUserData for FileData {
                                 p.push('/');
                             }
 
-                            let dir = Path::new(&p);
+                            let dir: &Path = Path::new(&p);
 
                             if !dir.exists() {
                                 fs::create_dir_all(dir).await.to_lua_err()?;
@@ -134,18 +128,17 @@ impl LuaUserData for FileData {
 
                             match path[1].clone() {
                                 LuaValue::String(f) => {
-                                    let file_name = f.to_str()?;
+                                    let file_name: &str = f.to_str()?;
 
-                                    let new_file_name = dir.join(file_name);
-                                    let mut file = fs::File::create(new_file_name.clone())
-                                        .await
-                                        .to_lua_err()?;
+                                    let new_file_name: std::path::PathBuf = dir.join(file_name);
+                                    let mut file: fs::File =
+                                        fs::File::create(new_file_name.clone())
+                                            .await
+                                            .to_lua_err()?;
                                     file.write_all(&this.content).await.to_lua_err()?;
-                                    // fs::write(new_file_name, this.content.as_ref())
-                                    //     .await
-                                    //     .to_lua_err()?;
-                                    let f_name = new_file_name.to_str().unwrap_or("");
-                                    let file_name = lua.create_string(&f_name)?;
+
+                                    let f_name: &str = new_file_name.to_str().unwrap_or("");
+                                    let file_name: LuaString = lua.create_string(&f_name)?;
                                     return Ok((true, file_name));
                                 }
                                 _ => {
@@ -166,22 +159,22 @@ impl LuaUserData for FileData {
 
             if path.exists() {
                 if path.is_file() {
-                    let file_name = path
+                    let file_name: &str = path
                         .file_name()
                         .unwrap_or_else(|| OsStr::new("default.txt"))
                         .to_str()
                         .unwrap_or("default.txt");
                     let field_name: Vec<&str> = file_name.split('.').collect();
-                    let ext = path
+                    let ext: &str = path
                         .extension()
                         .unwrap_or_else(|| OsStr::new("txt"))
                         .to_str()
                         .unwrap_or("txt");
 
-                    let mut f = fs::File::open(path).await.to_lua_err()?;
-                    let mut buffer = Vec::new();
+                    let mut f: fs::File = fs::File::open(path).await.to_lua_err()?;
+                    let mut buffer: Vec<u8> = Vec::new();
                     f.read_to_end(&mut buffer).await?;
-                    let file = FileData::new(field_name[0], file_name, ext, buffer);
+                    let file: FileData = FileData::new(field_name[0], file_name, ext, buffer);
                     Ok(file)
                 } else {
                     Err(LuaError::ExternalError(Arc::new(WebError::new(
@@ -197,12 +190,12 @@ impl LuaUserData for FileData {
             }
         });
         _methods.add_async_function("get_file", |lua, this: LuaAnyUserData| async move {
-            let table = lua.create_table()?;
-            let headers = lua.create_table()?;
-            let this = this.take::<Self>()?;
+            let table: LuaTable = lua.create_table()?;
+            let headers: LuaTable = lua.create_table()?;
+            let this: FileData = this.take::<Self>()?;
             table.set("status", LuaValue::Integer(200))?;
             if this.content_type == "txt" {
-                let s = lua.create_string(&"text/plain")?;
+                let s: LuaString = lua.create_string(&"text/plain")?;
                 headers.set("Content-Type", LuaValue::String(s))?;
             } else if this.content_type == "html" {
                 headers.set(
@@ -261,9 +254,9 @@ impl LuaUserData for FileData {
             Ok(table)
         });
         _methods.add_async_function("download", |lua, this: LuaAnyUserData| async move {
-            let table = lua.create_table()?;
-            let headers = lua.create_table()?;
-            let this = this.take::<Self>()?;
+            let table: LuaTable = lua.create_table()?;
+            let headers: LuaTable = lua.create_table()?;
+            let this: FileData = this.take::<Self>()?;
             table.set("status", LuaValue::Integer(200))?;
             headers.set(
                 "Content-Type",
