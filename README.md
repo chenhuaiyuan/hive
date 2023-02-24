@@ -1,10 +1,11 @@
 # Hive
 
-`hive`打算成为一个支持多脚本语言的web framework。
-目前只支持lua语言，未来将支持JavaScript和python
+尝试打造一个rust + lua的 web framework。
+后期尝试结合更多语言
 
 ## features
 
+- [ ] http2.0支持
 - [x] lua dev 模式下自动热更新
 - [ ] lua release 模式下热更新
 - [x] websocket(可以使用，还有需要优化的地方)

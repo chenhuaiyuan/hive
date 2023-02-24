@@ -2,6 +2,12 @@ use super::lua_request::LuaRequest;
 use crate::error::Error as WebError;
 use futures_util::Future;
 
+#[cfg(feature = "h2")]
+use crate::LocalExec;
+#[cfg(feature = "h2")]
+use http::header::UPGRADE;
+#[cfg(feature = "h2")]
+use http::StatusCode;
 use http::Version;
 use hyper::{server::conn::AddrStream, service::Service, Body, Request, Response};
 use mlua::prelude::*;
@@ -197,7 +203,12 @@ fn return_err_info(err: LuaError) -> (u16, String) {
 pub struct MakeSvc(pub Arc<Lua>);
 
 impl Service<&AddrStream> for MakeSvc {
+    #[cfg(not(feature = "h2"))]
     type Response = Svc;
+
+    #[cfg(feature = "h2")]
+    type Response = H2Svc;
+
     type Error = WebError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
@@ -208,6 +219,54 @@ impl Service<&AddrStream> for MakeSvc {
     fn call(&mut self, stream: &AddrStream) -> Self::Future {
         let lua = self.0.clone();
         let remote_addr = stream.remote_addr();
-        Box::pin(async move { Ok(Svc(lua, remote_addr)) })
+
+        #[cfg(feature = "h2")]
+        {
+            Box::pin(async move { Ok(H2Svc(lua, remote_addr)) })
+        }
+        #[cfg(not(feature = "h2"))]
+        {
+            Box::pin(async move { Ok(Svc(lua, remote_addr)) })
+        }
+    }
+}
+
+#[cfg(feature = "h2")]
+pub struct H2Svc(pub Arc<Lua>, SocketAddr);
+
+#[cfg(feature = "h2")]
+impl Service<Request<Body>> for H2Svc {
+    type Response = Response<Body>;
+    type Error = WebError;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Request<Body>) -> Self::Future {
+        let lua = self.0.clone();
+        let remote_addr = self.1.clone();
+        let mut res = Response::new(Body::empty());
+        if !req.headers().contains_key(UPGRADE) {
+            *res.status_mut() = StatusCode::BAD_REQUEST;
+            return Box::pin(async move { Ok(res) });
+        }
+        Box::pin(async move {
+            let conn = hyper::upgrade::on(req).await?;
+            let http = hyper::server::conn::Http::new();
+            http.with_executor(LocalExec)
+                .serve_connection(conn, Svc(lua, remote_addr))
+                .await?;
+
+            *res.status_mut() = StatusCode::SWITCHING_PROTOCOLS;
+            res.headers_mut()
+                .insert(UPGRADE, http::HeaderValue::from_static("h2c"));
+            Ok(res)
+            // Ok(Response::builder()
+            //     .status(StatusCode::SWITCHING_PROTOCOLS)
+            //     .header(UPGRADE, "h2c")
+            //     .body(Body::empty())?)
+        })
     }
 }

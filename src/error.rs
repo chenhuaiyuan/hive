@@ -6,6 +6,7 @@ use downloader::Error as DownloaderError;
 use fast_log::error::LogError;
 use hyper::Error as HyperError;
 
+use http::Error as HttpError;
 #[cfg(feature = "lua")]
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use multer::Error as MulterError;
@@ -132,6 +133,12 @@ impl From<MulterError> for Error {
 
 impl From<FromUtf8Error> for Error {
     fn from(value: FromUtf8Error) -> Self {
+        Self::new(2007, value.to_string())
+    }
+}
+
+impl From<HttpError> for Error {
+    fn from(value: HttpError) -> Self {
         Self::new(2007, value.to_string())
     }
 }

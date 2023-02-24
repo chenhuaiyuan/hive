@@ -12,11 +12,12 @@ lua = ["mlua", "mysql"]
 js = ["v8"]
 # mysql = ["sqlx", "time"]
 mysql = ["mysql_async", "dateparser"]
+h2 = []
 
 [dependencies]
 tokio = { version = "1", features = ["full"]}
 mlua = {version = "0.8", features = ["lua54", "async", "vendored", "serialize"], optional = true}
-hyper = {version = "0.14", features = ["server", "http1", "tcp", "stream"]}
+hyper = {version = "0.14", features = ["server", "http1", "http2", "tcp", "stream"]}
 http = "0.2"
 http-body = "0.4"
 futures-util = "0.3"

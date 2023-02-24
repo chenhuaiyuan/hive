@@ -205,7 +205,7 @@ async fn main() -> WebResult<()> {
 
 #[cfg(feature = "lua")]
 #[derive(Clone, Copy, Debug)]
-struct LocalExec;
+pub struct LocalExec;
 #[cfg(feature = "lua")]
 impl<F> hyper::rt::Executor<F> for LocalExec
 where
