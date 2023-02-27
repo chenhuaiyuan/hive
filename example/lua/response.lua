@@ -4,14 +4,14 @@ function response.json(data)
   return {
     ['status'] = 200,
     ['headers'] = {
-      ['Content-type'] = 'application/json'
+      ['Content-type'] = 'application/json',
+      ['upgrade'] = 'h2c'
     },
     ['body'] = hive.table_to_json(data)
   }
 end
 
 function response.success(data, code, message)
-
   if nil == message then
     message = 'Ok'
   end
@@ -36,7 +36,8 @@ function response.html(body)
   return {
     ['status'] = 200,
     ['headers'] = {
-      ['Content-type'] = 'text/html'
+      ['Content-type'] = 'text/html',
+      ['upgrade'] = 'h2c'
     },
     ['body'] = body
   }

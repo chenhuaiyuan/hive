@@ -1,6 +1,7 @@
 local _M = {}
 local valid = require 'utils.validation'
 local tera = require 'utils.tera'
+-- local orm = loadfile 'orm/query.lua'
 
 function _M.index(request)
   return {
@@ -11,6 +12,12 @@ function _M.index(request)
     ['body'] = '<h1>hello world!</h1>'
   }
 end
+
+-- sqlite需要安装指定的库，后期可能会考虑到性能问题直接合并到hive程序中
+-- function _M.sql_test()
+--   local mysql = orm().mysql():db('test'):find()
+--   local sqlite = orm().sqlite():db('test'):find('id', 'name') -- sqlite 需要给出对应的字段
+-- end
 
 function _M.get_user_info(request)
   local params = request._request:params()
