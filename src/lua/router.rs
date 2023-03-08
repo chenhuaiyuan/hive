@@ -2,12 +2,11 @@ use mlua::prelude::*;
 use std::collections::HashMap;
 
 // Router<(function, middleware)>
-type Router =
-    HashMap<String, matchit::Router<(LuaFunction<'static>, Option<LuaFunction<'static>>)>>;
+type Router<'a> = HashMap<String, matchit::Router<(LuaFunction<'a>, Option<LuaFunction<'a>>)>>;
 
-pub struct HiveRouter(Router);
+pub struct HiveRouter<'a>(Router<'a>);
 
-impl LuaUserData for HiveRouter {
+impl<'a> LuaUserData for HiveRouter<'a> {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
         _methods.add_function("new", |_, ()| {
             let router = Router::new();
@@ -23,10 +22,9 @@ impl LuaUserData for HiveRouter {
                 LuaFunction,
                 Option<LuaFunction>,
             )| {
-                let func: LuaFunction<'static> = unsafe { std::mem::transmute(func) };
+                let func: LuaFunction<'a> = unsafe { std::mem::transmute(func) };
                 if let Some(middleware) = middleware {
-                    let middleware: LuaFunction<'static> =
-                        unsafe { std::mem::transmute(middleware) };
+                    let middleware: LuaFunction<'a> = unsafe { std::mem::transmute(middleware) };
                     this.0
                         .entry(method.to_uppercase())
                         .or_default()

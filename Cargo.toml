@@ -66,3 +66,5 @@ dateparser = {version = "0.1", optional = true}
 matchit = "0.7.0"
 
 hive_base = {path = "hive_base"}
+
+# serde-querystring = "0.2"

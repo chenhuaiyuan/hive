@@ -132,7 +132,10 @@ impl LuaUserData for LuaRequest {
                 param.insert(field_name, LuaValue::UserData(lua.create_userdata(file)?));
                 Ok(param)
             };
-            let f1 = |mut param: HttpData<LuaValue<'lua>>, param_key: String, fields, data| {
+            let f1 = |mut param: HttpData<LuaValue<'lua>>,
+                      param_key: String,
+                      fields: Vec<String>,
+                      data: JsonValue| {
                 let param_value = param.get(&param_key);
                 if let Some(LuaValue::Table(value)) = param_value {
                     let temp_table = generate_table(lua, value.clone(), fields, data)?;
