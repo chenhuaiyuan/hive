@@ -1,5 +1,5 @@
-use hive_base::{json_value_to_lua_value, lua_value_to_json_value};
 use mlua::prelude::*;
+use serde_json::Value as JsonValue;
 use tera::Context;
 
 pub struct TeraContext(Context);
@@ -7,8 +7,8 @@ pub struct TeraContext(Context);
 impl LuaUserData for TeraContext {
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
         _methods.add_function("new", |_, ()| Ok(TeraContext(Context::new())));
-        _methods.add_method_mut("insert", |_, this, (key, val): (String, LuaValue)| {
-            let val = lua_value_to_json_value(val)?;
+        _methods.add_method_mut("insert", |lua, this, (key, val): (String, LuaValue)| {
+            let val: JsonValue = lua.from_value(val)?;
             this.0.insert(key, &val);
             Ok(())
         });
@@ -20,12 +20,12 @@ impl LuaUserData for TeraContext {
         _methods.add_function("into_json", |lua, this: LuaAnyUserData| {
             let this = this.take::<Self>()?;
             let json_data = this.0.into_json();
-            json_value_to_lua_value(lua, json_data)
+            lua.to_value(&json_data)
         });
         _methods.add_method("get", |lua, this, index: String| {
             let data = this.0.get(&index);
             if let Some(data) = data {
-                json_value_to_lua_value(lua, data.clone())
+                lua.to_value(&data)
             } else {
                 Ok(LuaValue::Nil)
             }
@@ -33,7 +33,7 @@ impl LuaUserData for TeraContext {
         _methods.add_method_mut("remove", |lua, this, index: String| {
             let data = this.0.remove(&index);
             if let Some(data) = data {
-                json_value_to_lua_value(lua, data)
+                lua.to_value(&data)
             } else {
                 Ok(LuaValue::Nil)
             }

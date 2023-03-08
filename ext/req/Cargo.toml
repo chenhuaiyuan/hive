@@ -18,7 +18,7 @@ luajit = ["mlua/luajit"]
 vendored = ["mlua/vendored"]
 
 [dependencies]
-mlua = { version = "0.8", features = ["module"] }
+mlua = { version = "0.8", features = ["module", "serialize"] }
 
 ureq = {version = "2.5.0", features = ["json", "charset", "cookies"]}
 cookie_store = { version = "0.19", default-features = false, features = ["preserve_order"] }

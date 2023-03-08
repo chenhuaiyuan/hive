@@ -1,6 +1,5 @@
-use std::{fs::File, io::BufReader};
+use std::fs::File;
 
-use cookie_store::CookieStore;
 use ureq::{Agent, AgentBuilder, Proxy, RedirectAuthHeaders};
 
 use hive_time::TimeDuration;

@@ -17,6 +17,6 @@ luajit = ["mlua/luajit"]
 vendored = ["mlua/vendored"]
 
 [dependencies]
-mlua = { version = "0.8", features = ["module"] }
+mlua = { version = "0.8", features = ["module", "serialize"] }
 tera = "1.17"
-hive_base = {path = "../../hive_base"}
+serde_json = "1"

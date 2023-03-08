@@ -24,7 +24,7 @@ use crate::lua::service::MakeSvc;
 #[cfg(feature = "ws")]
 use crate::lua::ws::create_message;
 #[cfg(feature = "lua")]
-use crate::lua::{file_data::FileData, json::create_table_to_json_string};
+use crate::lua::{file_data::FileData, json::create_lua_value_to_json_string};
 use clap::Parser;
 use fast_log::{
     config::Config,
@@ -88,7 +88,7 @@ async fn lua_run(args: Args) -> WebResult<()> {
 
     let hive: LuaTable = lua.create_table()?;
 
-    hive.set("table_to_json", create_table_to_json_string(&lua)?)?;
+    hive.set("to_json", create_lua_value_to_json_string(&lua)?)?;
     hive.set("file_data", lua.create_proxy::<FileData>()?)?;
     hive.set("web_error", create_error(&lua)?)?;
     if let Some(ref custom_params) = args.custom_params {

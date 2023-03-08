@@ -2,8 +2,6 @@ use mlua::prelude::*;
 use serde_json::Value;
 use ureq::Response;
 
-use crate::json_value_to_lua_value;
-
 pub struct ReqResponse(pub Response);
 
 impl LuaUserData for ReqResponse {
@@ -45,7 +43,7 @@ impl LuaUserData for ReqResponse {
             let this = this.take::<Self>()?;
             let data = this.0.into_json::<Value>().to_lua_err()?;
 
-            json_value_to_lua_value(data, lua)
+            lua.to_value(&data)
         });
     }
 }

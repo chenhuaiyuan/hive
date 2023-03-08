@@ -1,7 +1,7 @@
 use std::path::Path;
 
-use hive_base::lua_value_to_json_value;
 use mlua::prelude::*;
+use serde_json::Value as JsonValue;
 use tera::{Context, Tera};
 
 pub struct TeraSelf(Tera);
@@ -16,8 +16,8 @@ impl LuaUserData for TeraSelf {
         });
         _methods.add_method(
             "render",
-            |_, this, (template_name, context): (String, LuaTable)| {
-                let context = lua_value_to_json_value(LuaValue::Table(context))?;
+            |lua, this, (template_name, context): (String, LuaTable)| {
+                let context: JsonValue = lua.from_value(LuaValue::Table(context))?;
                 let context = Context::from_value(context).to_lua_err()?;
                 let html = this.0.render(&template_name, &context).to_lua_err()?;
                 Ok(html)
@@ -25,8 +25,8 @@ impl LuaUserData for TeraSelf {
         );
         _methods.add_function(
             "one_off",
-            |_, (input, context, autoescape): (String, LuaTable, bool)| {
-                let context = lua_value_to_json_value(LuaValue::Table(context))?;
+            |lua, (input, context, autoescape): (String, LuaTable, bool)| {
+                let context: JsonValue = lua.from_value(LuaValue::Table(context))?;
                 let context = Context::from_value(context).to_lua_err()?;
                 let html = Tera::one_off(&input, &context, autoescape).to_lua_err()?;
                 Ok(html)

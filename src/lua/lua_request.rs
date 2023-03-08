@@ -3,7 +3,6 @@ use crate::error::Error as WebError;
 #[cfg(feature = "ws")]
 use crate::lua::websocket::handle_connection;
 use crate::request::{HttpData, Request};
-use hive_base::json_value_to_lua_value;
 #[cfg(feature = "ws")]
 use http::header::{
     CONNECTION, SEC_WEBSOCKET_ACCEPT, SEC_WEBSOCKET_KEY, SEC_WEBSOCKET_VERSION, UPGRADE,
@@ -49,7 +48,7 @@ fn generate_table<'lua>(
     if let Ok(idx) = num {
         let i: i32 = idx + 1;
         if len == 0 {
-            let v: LuaValue = json_value_to_lua_value(lua, val)?;
+            let v: LuaValue = lua.to_value(&val)?;
             tab.set(i, v)?;
             generate_table(lua, tab, cap, JsonValue::Null)
         } else {
@@ -66,7 +65,7 @@ fn generate_table<'lua>(
             }
         }
     } else if len == 0 {
-        let v: LuaValue = json_value_to_lua_value(lua, val)?;
+        let v: LuaValue = lua.to_value(&val)?;
         tab.set(index, v)?;
         generate_table(lua, tab, cap, JsonValue::Null)
     } else {
@@ -104,7 +103,7 @@ impl LuaUserData for LuaRequest {
                 Ok(param)
             };
             let f2 = |mut param: HttpData<LuaValue<'lua>>, key, val| {
-                let val = json_value_to_lua_value(lua, val)?;
+                let val: LuaValue = lua.to_value(&val)?;
                 param.insert(key, val);
                 Ok(param)
             };
@@ -148,7 +147,7 @@ impl LuaUserData for LuaRequest {
                 Ok(param)
             };
             let f2 = |mut param: HttpData<LuaValue<'lua>>, field_name, data| {
-                let data = json_value_to_lua_value(lua, data)?;
+                let data: LuaValue = lua.to_value(&data)?;
                 param.insert(field_name, data);
                 Ok(param)
             };

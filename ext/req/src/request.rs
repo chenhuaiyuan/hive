@@ -1,9 +1,10 @@
 use hive_time::TimeDuration;
 use mlua::prelude::*;
+use serde_json::Value as JsonValue;
 
 use ureq::Request;
 
-use crate::{lua_value_to_json_value, response::ReqResponse};
+use crate::response::ReqResponse;
 
 pub struct ReqRequest(pub Request);
 
@@ -24,9 +25,9 @@ impl LuaUserData for ReqRequest {
         });
         _methods.add_function(
             "send_json",
-            |_, (this, data): (LuaAnyUserData, LuaTable)| {
+            |lua, (this, data): (LuaAnyUserData, LuaTable)| {
                 let this = this.take::<Self>()?;
-                let data = lua_value_to_json_value(mlua::Value::Table(data))?;
+                let data: JsonValue = lua.from_value(LuaValue::Table(data))?;
                 let resp = this.0.send_json(data).to_lua_err()?;
                 Ok(ReqResponse(resp))
             },

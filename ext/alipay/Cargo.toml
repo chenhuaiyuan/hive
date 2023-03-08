@@ -18,7 +18,7 @@ luajit = ["mlua/luajit"]
 vendored = ["mlua/vendored"]
 
 [dependencies]
-mlua = { version = "0.8", features = ["module", "async"] }
+mlua = { version = "0.8", features = ["module", "async", "serialize"] }
 
 alipay-rs = "0.4"
 

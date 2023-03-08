@@ -4,10 +4,9 @@ function response.json(data)
   return {
     ['status'] = 200,
     ['headers'] = {
-      ['Content-type'] = 'application/json',
-      ['upgrade'] = 'h2c'
+      ['Content-type'] = 'application/json'
     },
-    ['body'] = hive.table_to_json(data)
+    ['body'] = hive.to_json(data)
   }
 end
 
@@ -36,8 +35,7 @@ function response.html(body)
   return {
     ['status'] = 200,
     ['headers'] = {
-      ['Content-type'] = 'text/html',
-      ['upgrade'] = 'h2c'
+      ['Content-type'] = 'text/html'
     },
     ['body'] = body
   }
