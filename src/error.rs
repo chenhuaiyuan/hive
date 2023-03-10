@@ -30,8 +30,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 #[cfg(feature = "lua")]
 pub fn create_error(lua: &Lua) -> LuaResult<LuaFunction> {
     lua.create_function(|_, (code, message): (u16, String)| {
-        let err: Error = Error::new(code, message.clone());
-        log::error!("{}", message);
+        log::error!("{message}");
+        let err: Error = Error::new(code, message);
         Err::<(), MLuaError>(MLuaError::ExternalError(Arc::new(err)))
     })
 }

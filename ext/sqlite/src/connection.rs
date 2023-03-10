@@ -4,6 +4,17 @@ use rusqlite::{types::Value as SqliteValue, OpenFlags};
 
 use crate::{flags::SqliteOpenFlags, sqlite_value_to_lua_value, table_to_params};
 
+macro_rules! table_to_vec {
+    ($table: ident) => {{
+        let mut fields: Vec<String> = Vec::new();
+        for pairs in $table.pairs::<LuaValue, String>() {
+            let (_, field) = pairs?;
+            fields.push(field)
+        }
+        fields
+    }};
+}
+
 pub struct SqliteConnection(Connection);
 
 impl LuaUserData for SqliteConnection {
@@ -56,14 +67,14 @@ impl LuaUserData for SqliteConnection {
                 let mut stmt = this.0.prepare(&sql).to_lua_err()?;
                 let mut rows = stmt.query(params).to_lua_err()?;
                 let table = lua.create_table()?;
+                let fields = table_to_vec!(query_field);
                 let mut idx = 1;
                 while let Some(row) = rows.next().to_lua_err()? {
                     let sub_table = lua.create_table()?;
-                    for pair in query_field.clone().pairs::<LuaValue, String>() {
-                        let (_, field) = pair?;
+                    for field in fields.iter() {
                         let data: SqliteValue = row.get(field.as_str()).to_lua_err()?;
                         let data = sqlite_value_to_lua_value(lua, data)?;
-                        sub_table.set(field, data)?;
+                        sub_table.set(field.clone(), data)?;
                     }
                     table.set(idx, sub_table)?;
                     idx += 1;

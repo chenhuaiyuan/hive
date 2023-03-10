@@ -65,7 +65,7 @@ impl LuaUserData for FileData {
 
                         let new_file_name: String = random_name + suffix;
                         let mut file: fs::File =
-                            fs::File::create(new_file_name.clone()).await.to_lua_err()?;
+                            fs::File::create(&new_file_name).await.to_lua_err()?;
                         file.write_all(&this.content).await.to_lua_err()?;
                         let file_name: LuaString = lua.create_string(&new_file_name)?;
                         return Ok((true, file_name));
@@ -73,82 +73,71 @@ impl LuaUserData for FileData {
                     return Ok((false, lua.create_string(&"")?));
                 }
                 let path: Vec<LuaValue> = path.into_vec();
-                if path.len() == 1 {
-                    match path[0].clone() {
-                        LuaValue::String(v) => {
-                            let mut p: String = v.to_str()?.to_string();
-                            let last_char: char = p.pop().unwrap_or('/');
-                            if last_char == '/' {
-                                p.push('/');
-                            } else {
-                                p.push(last_char);
-                                p.push('/');
-                            }
+                let path_len = path.len();
+                if path_len == 1 {
+                    if let LuaValue::String(v) = &path[0] {
+                        let mut p: String = v.to_str()?.to_string();
+                        let last_char: char = p.pop().unwrap_or('/');
+                        if last_char == '/' {
+                            p.push('/');
+                        } else {
+                            p.push(last_char);
+                            p.push('/');
+                        }
 
-                            let dir: &Path = Path::new(&p);
+                        let dir: &Path = Path::new(&p);
 
-                            if !dir.exists() {
-                                fs::create_dir_all(dir).await.to_lua_err()?;
-                            }
+                        if !dir.exists() {
+                            fs::create_dir_all(dir).await.to_lua_err()?;
+                        }
 
-                            let file: Vec<&str> = this.file_name.split('.').collect();
-                            let suffix: &str = file[1];
+                        let file: Vec<&str> = this.file_name.split('.').collect();
+                        let suffix: &str = file[1];
 
-                            let random_name: String = nanoid!(16, &alphabet) + ".";
+                        let random_name: String = nanoid!(16, &alphabet) + ".";
 
-                            let new_file_name: std::path::PathBuf = dir.join(random_name + suffix);
+                        let new_file_name: std::path::PathBuf = dir.join(random_name + suffix);
+                        let mut file: fs::File =
+                            fs::File::create(&new_file_name).await.to_lua_err()?;
+                        file.write_all(&this.content).await.to_lua_err()?;
+                        let f_name: &str = new_file_name.to_str().unwrap_or("");
+                        let file_name: LuaString = lua.create_string(&f_name)?;
+                        return Ok((true, file_name));
+                    } else {
+                        return Ok((false, lua.create_string(&"")?));
+                    }
+                } else if path_len >= 2 {
+                    if let LuaValue::String(v) = &path[0] {
+                        let mut p: String = v.to_str()?.to_string();
+                        let last_char: char = p.pop().unwrap_or('/');
+                        if last_char == '/' {
+                            p.push('/');
+                        } else {
+                            p.push(last_char);
+                            p.push('/');
+                        }
+
+                        let dir: &Path = Path::new(&p);
+
+                        if !dir.exists() {
+                            fs::create_dir_all(dir).await.to_lua_err()?;
+                        }
+                        if let LuaValue::String(f) = &path[1] {
+                            let file_name: &str = f.to_str()?;
+
+                            let new_file_name: std::path::PathBuf = dir.join(file_name);
                             let mut file: fs::File =
-                                fs::File::create(new_file_name.clone()).await.to_lua_err()?;
+                                fs::File::create(&new_file_name).await.to_lua_err()?;
                             file.write_all(&this.content).await.to_lua_err()?;
+
                             let f_name: &str = new_file_name.to_str().unwrap_or("");
                             let file_name: LuaString = lua.create_string(&f_name)?;
                             return Ok((true, file_name));
-                        }
-                        _ => {
+                        } else {
                             return Ok((false, lua.create_string(&"")?));
                         }
-                    }
-                } else if path.len() >= 2 {
-                    match path[0].clone() {
-                        LuaValue::String(v) => {
-                            let mut p: String = v.to_str()?.to_string();
-                            let last_char: char = p.pop().unwrap_or('/');
-                            if last_char == '/' {
-                                p.push('/');
-                            } else {
-                                p.push(last_char);
-                                p.push('/');
-                            }
-
-                            let dir: &Path = Path::new(&p);
-
-                            if !dir.exists() {
-                                fs::create_dir_all(dir).await.to_lua_err()?;
-                            }
-
-                            match path[1].clone() {
-                                LuaValue::String(f) => {
-                                    let file_name: &str = f.to_str()?;
-
-                                    let new_file_name: std::path::PathBuf = dir.join(file_name);
-                                    let mut file: fs::File =
-                                        fs::File::create(new_file_name.clone())
-                                            .await
-                                            .to_lua_err()?;
-                                    file.write_all(&this.content).await.to_lua_err()?;
-
-                                    let f_name: &str = new_file_name.to_str().unwrap_or("");
-                                    let file_name: LuaString = lua.create_string(&f_name)?;
-                                    return Ok((true, file_name));
-                                }
-                                _ => {
-                                    return Ok((false, lua.create_string(&"")?));
-                                }
-                            }
-                        }
-                        _ => {
-                            return Ok((false, lua.create_string(&"")?));
-                        }
+                    } else {
+                        return Ok((false, lua.create_string(&"")?));
                     }
                 }
                 Ok((false, lua.create_string(&"")?))
