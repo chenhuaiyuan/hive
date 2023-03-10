@@ -66,3 +66,7 @@ dateparser = {version = "0.1", optional = true}
 matchit = "0.7.0"
 
 # serde-querystring = "0.2"
+
+
+# [profile.release]
+# debug = true

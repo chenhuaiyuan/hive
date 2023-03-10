@@ -8,7 +8,7 @@ use std::io::copy;
 use std::path::Path;
 use std::path::PathBuf;
 
-pub fn create_object(name: String) -> Result<()> {
+pub fn create_project(name: String) -> Result<()> {
     let mut current_dir: PathBuf = env::current_dir()?;
     current_dir = current_dir.join(name.clone());
     if current_dir.exists() {

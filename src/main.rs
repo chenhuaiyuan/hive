@@ -1,6 +1,6 @@
 mod error;
 mod file_data;
-mod init_object;
+mod init_project;
 #[cfg(feature = "js")]
 mod js;
 #[cfg(feature = "lua")]
@@ -11,7 +11,7 @@ mod request;
 use crate::error::create_error;
 
 use crate::error::Result as WebResult;
-use crate::init_object::create_object;
+use crate::init_project::create_project;
 #[cfg(feature = "lua")]
 use crate::lua::mysql_async::create_mysql;
 // use crate::lua::mysql_sqlx::create_sqlx;
@@ -184,7 +184,7 @@ async fn main() -> WebResult<()> {
         ))?;
         log::info!("env: dev mode");
     } else if let Some(object_name) = args.create {
-        create_object(object_name)?;
+        create_project(object_name)?;
         return Ok(());
     } else {
         fast_log::init(Config::new().file_split(
