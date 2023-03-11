@@ -59,10 +59,11 @@ impl LuaUserData for AlipayClient {
             |lua, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| async move {
                 let this = this.take::<Self>()?;
                 if !biz_content.is_empty() {
-                    let content = biz_content.into_vec();
+                    let mut content = biz_content.into_vec();
                     let mut params = HashMap::new();
                     if content.len() == 1 {
-                        if let LuaValue::Table(val) = content[0].clone() {
+                        let data = content.remove(0);
+                        if let LuaValue::Table(val) = data {
                             params = table_to_map!(lua, val);
                         } else {
                             return Err(LuaError::ExternalError(Arc::new(WebError::new(
@@ -75,10 +76,11 @@ impl LuaUserData for AlipayClient {
                         let mut i = 0;
                         if len % 2 == 0 {
                             while i < len {
-                                if let LuaValue::String(key) = content[i].clone() {
+                                let data = content.remove(0);
+                                if let LuaValue::String(key) = data {
                                     let k = key.to_str()?;
-                                    let json_value: JsonValue =
-                                        lua.from_value(content[i + 1].clone())?;
+                                    let val = content.remove(0);
+                                    let json_value: JsonValue = lua.from_value(val)?;
                                     params.insert(k.to_owned(), json_value);
                                 }
                                 i += 2;
@@ -104,10 +106,11 @@ impl LuaUserData for AlipayClient {
             |lua, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| {
                 let this = this.take::<Self>()?;
                 if !biz_content.is_empty() {
-                    let content = biz_content.into_vec();
+                    let mut content = biz_content.into_vec();
                     let mut params = HashMap::new();
                     if content.len() == 1 {
-                        if let LuaValue::Table(val) = content[0].clone() {
+                        let data = content.remove(0);
+                        if let LuaValue::Table(val) = data {
                             params = table_to_map!(lua, val);
                         } else {
                             return Err(LuaError::ExternalError(Arc::new(WebError::new(
@@ -120,10 +123,11 @@ impl LuaUserData for AlipayClient {
                         let mut i = 0;
                         if len % 2 == 0 {
                             while i < len {
-                                if let LuaValue::String(key) = content[i].clone() {
+                                let data = content.remove(0);
+                                if let LuaValue::String(key) = data {
                                     let k = key.to_str()?;
-                                    let json_value: JsonValue =
-                                        lua.from_value(content[i + 1].clone())?;
+                                    let val = content.remove(0);
+                                    let json_value: JsonValue = lua.from_value(val)?;
                                     params.insert(k.to_owned(), json_value);
                                 }
                                 i += 2;
@@ -171,10 +175,11 @@ impl LuaUserData for AlipayClientWithParams {
             |lua, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| async move {
                 let mut this = this.take::<Self>()?;
                 if !biz_content.is_empty() {
-                    let content = biz_content.into_vec();
+                    let mut content = biz_content.into_vec();
                     let mut params = HashMap::new();
                     if content.len() == 1 {
-                        if let LuaValue::Table(val) = content[0].clone() {
+                        let data = content.remove(0);
+                        if let LuaValue::Table(val) = data {
                             params = table_to_map!(lua, val);
                         } else {
                             return Err(LuaError::ExternalError(Arc::new(WebError::new(
@@ -187,10 +192,11 @@ impl LuaUserData for AlipayClientWithParams {
                         let mut i = 0;
                         if len % 2 == 0 {
                             while i < len {
-                                if let LuaValue::String(key) = content[i].clone() {
+                                let data = content.remove(0);
+                                if let LuaValue::String(key) = data {
                                     let k = key.to_str()?;
-                                    let json_value: JsonValue =
-                                        lua.from_value(content[i + 1].clone())?;
+                                    let val = content.remove(0);
+                                    let json_value: JsonValue = lua.from_value(val)?;
                                     params.insert(k.to_owned(), json_value);
                                 }
                                 i += 2;
@@ -216,10 +222,11 @@ impl LuaUserData for AlipayClientWithParams {
             |lua, (this, method, biz_content): (LuaAnyUserData, String, LuaMultiValue)| {
                 let mut this = this.take::<Self>()?;
                 if !biz_content.is_empty() {
-                    let content = biz_content.into_vec();
+                    let mut content = biz_content.into_vec();
                     let mut params = HashMap::new();
                     if content.len() == 1 {
-                        if let LuaValue::Table(val) = content[0].clone() {
+                        let data = content.remove(0);
+                        if let LuaValue::Table(val) = data {
                             params = table_to_map!(lua, val);
                         } else {
                             return Err(LuaError::ExternalError(Arc::new(WebError::new(
@@ -232,10 +239,11 @@ impl LuaUserData for AlipayClientWithParams {
                         let mut i = 0;
                         if len % 2 == 0 {
                             while i < len {
-                                if let LuaValue::String(key) = content[i].clone() {
+                                let data = content.remove(0);
+                                if let LuaValue::String(key) = data {
                                     let k = key.to_str()?;
-                                    let json_value: JsonValue =
-                                        lua.from_value(content[i + 1].clone())?;
+                                    let val = content.remove(0);
+                                    let json_value: JsonValue = lua.from_value(val)?;
                                     params.insert(k.to_owned(), json_value);
                                 }
                                 i += 2;

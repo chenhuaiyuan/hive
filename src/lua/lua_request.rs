@@ -91,9 +91,9 @@ impl LuaUserData for LuaRequest {
                       param_key: String,
                       fields: Vec<String>,
                       val| {
-                let param_value = param.get(&param_key);
+                let param_value = param.remove(&param_key);
                 if let Some(LuaValue::Table(value)) = param_value {
-                    let temp_table = generate_table(lua, value.clone(), fields, val)?;
+                    let temp_table = generate_table(lua, value, fields, val)?;
                     param.insert(param_key, LuaValue::Table(temp_table));
                 } else {
                     let temp = lua.create_table()?;
@@ -135,9 +135,9 @@ impl LuaUserData for LuaRequest {
                       param_key: String,
                       fields: Vec<String>,
                       data: JsonValue| {
-                let param_value = param.get(&param_key);
+                let param_value = param.remove(&param_key);
                 if let Some(LuaValue::Table(value)) = param_value {
-                    let temp_table = generate_table(lua, value.clone(), fields, data)?;
+                    let temp_table = generate_table(lua, value, fields, data)?;
                     param.insert(param_key.to_string(), LuaValue::Table(temp_table));
                 } else {
                     let temp = lua.create_table()?;

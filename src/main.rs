@@ -31,13 +31,17 @@ use fast_log::{
     consts::LogSize,
     plugin::{file_split::RollingType, packer::ZipPacker},
 };
+use futures_util::Future;
 use hyper::Server;
 #[cfg(feature = "lua")]
 use mlua::prelude::*;
+use once_cell::sync::Lazy;
 use std::fs;
 use std::net::IpAddr;
 use std::net::SocketAddr;
 use std::sync::Arc;
+
+pub static HALF_NUM_CPUS: Lazy<usize> = Lazy::new(|| 1.max(num_cpus::get() / 2));
 
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
@@ -142,7 +146,7 @@ async fn lua_run(args: Args) -> WebResult<()> {
 }
 
 #[cfg(feature = "js")]
-fn v8_run(args: Args) -> WebResult<()> {
+async fn v8_run(args: Args) -> WebResult<()> {
     // use v8::{Context, ContextScope, HandleScope, Isolate, Script, String, TryCatch, V8};
 
     // use crate::js::server::create_server;
@@ -172,8 +176,8 @@ fn v8_run(args: Args) -> WebResult<()> {
     Ok(())
 }
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> WebResult<()> {
+// #[tokio::main(flavor = "multi_thread")]
+fn main() -> WebResult<()> {
     let args = Args::parse();
     if args.dev {
         fast_log::init(Config::new().console().file_split(
@@ -197,9 +201,9 @@ async fn main() -> WebResult<()> {
     log::info!("app start...");
 
     #[cfg(feature = "lua")]
-    lua_run(args).await?;
+    block_on(lua_run(args))?;
     #[cfg(feature = "js")]
-    v8_run(args)?;
+    block_on(v8_run(args))?;
     Ok(())
 }
 
@@ -214,4 +218,13 @@ where
     fn execute(&self, fut: F) {
         tokio::task::spawn_local(fut);
     }
+}
+
+fn block_on<F: Future>(f: F) -> F::Output {
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(*HALF_NUM_CPUS)
+        .build()
+        .unwrap()
+        .block_on(f)
 }

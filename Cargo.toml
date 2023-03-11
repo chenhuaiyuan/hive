@@ -7,7 +7,7 @@ edition = "2021"
 
 [features]
 default = ["lua"]
-ws = ["once_cell", "tokio-tungstenite", "futures-channel", "tungstenite"]
+ws = ["tokio-tungstenite", "futures-channel", "tungstenite"]
 lua = ["mlua", "mysql"]
 js = ["v8"]
 # mysql = ["sqlx", "time"]
@@ -41,16 +41,16 @@ fast_log = {version = "1.5", features = ["zip"]}
 
 notify = "5.1"
 
-# num_cpus = "1.15.0"
+num_cpus = "1.15.0"
 
-once_cell = {version = "1.16.0", optional = true}
+once_cell = {version = "1.16.0"}
 
 # websocket
 tokio-tungstenite = {version = "0.18", optional = true}
 futures-channel = {version = "0.3.25", optional = true}
 tungstenite = {version = "0.18.0", optional = true}
 
-downloader = "0.2"
+downloader = {version = "0.2"}
 zip = "0.6"
 
 v8 = {version = "0.61.0", optional = true}
@@ -66,7 +66,6 @@ dateparser = {version = "0.1", optional = true}
 matchit = "0.7.0"
 
 # serde-querystring = "0.2"
-
 
 # [profile.release]
 # debug = true

@@ -10,7 +10,7 @@ use std::path::PathBuf;
 
 pub fn create_project(name: String) -> Result<()> {
     let mut current_dir: PathBuf = env::current_dir()?;
-    current_dir = current_dir.join(name.clone());
+    current_dir = current_dir.join(&name);
     if current_dir.exists() {
         println!("当前目录已存在{name}项目");
         return Ok(());
@@ -24,21 +24,19 @@ pub fn create_project(name: String) -> Result<()> {
     )
     .file_name(Path::new(&file_name));
 
-    let result = dloader.download(&[dl])?;
+    let result = dloader.download(&[dl])?.remove(0);
 
-    for r in result {
-        if r.is_ok() {
-            archive(file_name.clone(), Path::new(&name))?;
-        } else if let Err(e) = r {
-            println!("Error: {e}");
-        }
+    if result.is_ok() {
+        archive(file_name, Path::new(&name))?;
+    } else if let Err(e) = result {
+        println!("Error: {e}");
     }
     Ok(())
 }
 
 fn archive(file: String, target: &Path) -> Result<()> {
     let current_dir: PathBuf = env::current_dir()?;
-    let zip_file: fs::File = fs::File::open(file.clone())?;
+    let zip_file: fs::File = fs::File::open(&file)?;
     let mut zip: ZipArchive<fs::File> = zip::ZipArchive::new(zip_file)?;
 
     if !target.exists() {
