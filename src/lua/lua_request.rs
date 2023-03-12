@@ -193,7 +193,7 @@ impl LuaUserData for LuaRequest {
                 } else {
                     // let ver = this.0.version();
                     let mut req = this.0.req;
-                    let func: LuaFunction<'static> = unsafe { std::mem::transmute(func) };
+                    let func: LuaFunction<'a> = unsafe { std::mem::transmute(func) };
                     tokio::task::spawn_local(async move {
                         match hyper::upgrade::on(&mut req).await {
                             Ok(upgraded) => {

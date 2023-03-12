@@ -32,8 +32,10 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
 
     let mut current_dir: std::path::PathBuf =
         env::current_dir().expect("Failed to determine current directory");
-    if args.watch_dir != "." {
-        current_dir.push(args.watch_dir.clone());
+    let args_watch_dir: &str = &args.watch_dir;
+    let args_file: &str = &args.file;
+    if args_watch_dir != "." {
+        current_dir.push(args_watch_dir);
     }
     watcher.watch(&current_dir, RecursiveMode::Recursive)?;
 
@@ -41,7 +43,7 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
         let event = res?;
         if event.kind.is_modify() {
             for path in event.paths {
-                if path != Path::new(&args.file) {
+                if path != Path::new(args_file) {
                     let current_dir_len = current_dir.as_os_str().len() + 1;
                     let p = path.to_str();
                     if let Some(p) = p {
@@ -51,15 +53,15 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
                             let data = file.rsplit_once('.');
                             if let Some((mode, _)) = data {
                                 let mut m;
-                                if args.watch_dir != "." {
-                                    let watch_dir = args.watch_dir.clone().replace('/', ".");
+                                if args_watch_dir != "." {
+                                    let watch_dir = args_watch_dir.replace('/', ".");
                                     m = watch_dir + ".";
                                     m += mode;
                                 } else {
                                     m = mode.to_string();
                                 }
                                 hotfix.call::<_, ()>(m)?;
-                                let file = tokio::fs::read(args.file.clone()).await?;
+                                let file = tokio::fs::read(args_file).await?;
 
                                 let handler: LuaTable = lua.load(&file).eval()?;
                                 lua.set_named_registry_value(
@@ -74,7 +76,7 @@ pub async fn async_watch(lua: Arc<Lua>, args: Args) -> Result<()> {
                         }
                     }
                 } else {
-                    let file: Vec<u8> = tokio::fs::read(args.file.clone()).await?;
+                    let file: Vec<u8> = tokio::fs::read(args_file).await?;
 
                     let handler: LuaTable = lua.load(&file).eval()?;
                     lua.set_named_registry_value(
