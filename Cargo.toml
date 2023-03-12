@@ -67,5 +67,8 @@ matchit = "0.7.0"
 
 # serde-querystring = "0.2"
 
-# [profile.release]
+[profile.release]
 # debug = true
+lto = true
+codegen-units = 1
+panic = "abort"
