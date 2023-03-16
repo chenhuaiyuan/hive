@@ -5,6 +5,7 @@ local rep = string.rep
 local reverse = string.reverse
 local concat = table.concat
 local sub = string.sub
+local find = string.find
 -- local p = require 'utils.print_table'
 
 local orm = {
@@ -102,7 +103,20 @@ end
 ---@param ... any
 ---@return table
 function orm:columns(...)
-  self._columns = { ... }
+  local columns = {...}
+  for i, val in ipairs(columns) do
+    local as_exist = find(val, 'as')
+    local bracket_exist = find(val, '%(')
+    if as_exist == nil and bracket_exist == nil then
+      columns[i] = '`' .. columns[i] .. '`'
+    end
+  end
+  self._columns = columns
+  return self
+end
+
+function orm:raw_columns(...)
+  self._columns = {...}
   return self
 end
 
@@ -154,6 +168,35 @@ function orm:or_where(key, operator, val)
       self._wheres = self._wheres .. ' OR ' .. key .. ' = ? '
       insert(self._params, operator)
     end
+  end
+  return self
+end
+
+---where key between value1 and value2
+---@param key string
+---@param value table
+function orm:where_between(key, value)
+  if self._wheres == nil then
+    self._wheres = ' WHERE ' .. key .. ' BETWEEN ? AND ? '
+    array_merge(self._params, value)
+  else
+    self._wheres = self._wheres .. ' AND ' .. key .. ' BETWEEN ? AND ? '
+    array_merge(self._params, value)
+  end
+  return self
+end
+
+---or key between value1 and value2
+---@param key string
+---@param value table
+---@return self
+function orm:or_where_between(key, value)
+  if self._wheres == nil then
+    self._wheres = ' WHERE ' .. key .. ' BETWEEN ? AND ? '
+    array_merge(self._params, value)
+  else
+    self._wheres = self._wheres .. ' OR ' .. key .. ' BETWEEN ? AND ? '
+    array_merge(self._params, value)
   end
   return self
 end
@@ -641,7 +684,7 @@ function orm:delete(datetime)
     if self._database ~= '' then
       sql = 'UPDATE `' .. self._database .. '`.' .. self._table .. ' SET ' .. DELETEDTIME .. ' = ? '
     else
-      sql = 'UPDATE ' .. self._table .. ' SET' .. DELETEDTIME .. ' = ? '
+      sql = 'UPDATE ' .. self._table .. ' SET ' .. DELETEDTIME .. ' = ? '
     end
   else
     if self._database ~= '' then
