@@ -1,5 +1,4 @@
 local function update_func(new_func, old_func)
-
   -- Get upvalues of old function.
   local old_upvalue_map = {}
   for i = 1, math.huge do
@@ -21,7 +20,6 @@ local function update_func(new_func, old_func)
 end
 
 local function update_table(new_table, old_table)
-
   -- Compare 2 tables, and update old table.
   for key, value in pairs(new_table) do
     local old_value = old_table[key]
@@ -43,9 +41,7 @@ local function update_table(new_table, old_table)
 end
 
 local function hotfix(filename)
-  if filename == '.git' then
-    return
-  elseif filename == 'route' then
+  if filename == 'route' then
     local oldModule
     if package.loaded[filename] then
       oldModule = package.loaded[filename]

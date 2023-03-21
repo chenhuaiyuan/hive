@@ -68,8 +68,11 @@ matchit = "0.7.0"
 # serde-querystring = "0.2"
 
 [profile.release]
-# debug = true
+debug = false
 lto = "fat"
 opt-level = 3
 codegen-units = 1
 panic = "abort"
+strip = 'symbols'
+debug-assertions = false
+overflow-checks = false
