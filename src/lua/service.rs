@@ -8,7 +8,7 @@ use crate::LocalExec;
 use http::header::UPGRADE;
 #[cfg(feature = "h2")]
 use http::StatusCode;
-use http::Version;
+// use http::Version;
 use hyper::{server::conn::AddrStream, service::Service, Body, Request, Response};
 use mlua::prelude::*;
 use std::net::SocketAddr;
@@ -17,7 +17,13 @@ use std::sync::Arc;
 use std::task::Context;
 use std::task::Poll;
 
-pub struct Svc(Arc<Lua>, SocketAddr);
+// pub struct Svc(Arc<Lua>, SocketAddr);
+pub struct Svc {
+    lua: Arc<Lua>,
+    remote_addr: SocketAddr,
+    handler: Arc<LuaRegistryKey>,
+    exception: Arc<LuaRegistryKey>,
+}
 
 impl Service<Request<Body>> for Svc {
     type Response = Response<Body>;
@@ -29,19 +35,22 @@ impl Service<Request<Body>> for Svc {
     }
 
     fn call(&mut self, req: Request<Body>) -> Self::Future {
-        let lua: Arc<Lua> = self.0.clone();
+        let lua: Arc<Lua> = self.lua.clone();
         let method: String = req.method().as_str().to_string();
         let path: String = req.uri().path().to_string();
-        let lua_req: LuaRequest = LuaRequest::new(req, self.1);
+        let lua_req: LuaRequest = LuaRequest::new(req, self.remote_addr);
+        let handler = self.handler.clone();
+        let exception = self.exception.clone();
         log::info!(
             "Request -- remote address: {}, method: {}, uri: {}",
-            self.1,
+            self.remote_addr,
             method,
             path
         );
 
         Box::pin(async move {
-            let handler: LuaFunction = lua.named_registry_value("http_handler")?;
+            // let handler: LuaFunction = lua.named_registry_value("http_handler")?;
+            let handler: LuaFunction = lua.registry_value(&handler)?;
 
             match handler
                 .call_async::<_, LuaValue>((method, path, lua_req))
@@ -58,21 +67,21 @@ impl Service<Request<Body>> for Svc {
                             .unwrap_or(200);
                         let mut resp: http::response::Builder = Response::builder().status(status);
 
-                        let version: Option<String> =
-                            v.get::<_, Option<String>>("version").to_lua_err()?;
-                        if let Some(ver) = version {
-                            if ver == "HTTP/0.9" {
-                                resp = resp.version(Version::HTTP_09);
-                            } else if ver == "HTTP/1.0" {
-                                resp = resp.version(Version::HTTP_10);
-                            } else if ver == "HTTP/1.1" {
-                                resp = resp.version(Version::HTTP_11);
-                            } else if ver == "HTTP/2.0" {
-                                resp = resp.version(Version::HTTP_2);
-                            } else if ver == "HTTP/3.0" {
-                                resp = resp.version(Version::HTTP_3);
-                            }
-                        }
+                        // let version: Option<String> =
+                        //     v.get::<_, Option<String>>("version").to_lua_err()?;
+                        // if let Some(ver) = version {
+                        //     if ver == "HTTP/0.9" {
+                        //         resp = resp.version(Version::HTTP_09);
+                        //     } else if ver == "HTTP/1.0" {
+                        //         resp = resp.version(Version::HTTP_10);
+                        //     } else if ver == "HTTP/1.1" {
+                        //         resp = resp.version(Version::HTTP_11);
+                        //     } else if ver == "HTTP/2.0" {
+                        //         resp = resp.version(Version::HTTP_2);
+                        //     } else if ver == "HTTP/3.0" {
+                        //         resp = resp.version(Version::HTTP_3);
+                        //     }
+                        // }
 
                         if let Some(headers) =
                             v.get::<_, Option<LuaTable>>("headers").to_lua_err()?
@@ -95,7 +104,8 @@ impl Service<Request<Body>> for Svc {
                 },
                 Err(err) => {
                     println!("{err:?}");
-                    let exception: LuaFunction = lua.named_registry_value("exception")?;
+                    // let exception: LuaFunction = lua.named_registry_value("exception")?;
+                    let exception: LuaFunction = lua.registry_value(&exception)?;
                     let (code, message) = return_err_info(err);
                     log::error!("{}", message);
                     let resp = exception.call_async::<_, LuaValue>((code, message)).await?;
@@ -200,7 +210,11 @@ fn return_err_info(err: LuaError) -> (u16, String) {
     }
 }
 
-pub struct MakeSvc(pub Arc<Lua>);
+pub struct MakeSvc {
+    pub lua: Arc<Lua>,
+    pub handler: Arc<LuaRegistryKey>,
+    pub exception: Arc<LuaRegistryKey>,
+}
 
 impl Service<&AddrStream> for MakeSvc {
     #[cfg(not(feature = "h2"))]
@@ -217,7 +231,9 @@ impl Service<&AddrStream> for MakeSvc {
     }
 
     fn call(&mut self, stream: &AddrStream) -> Self::Future {
-        let lua = self.0.clone();
+        let lua = self.lua.clone();
+        let handler = self.handler.clone();
+        let exception = self.exception.clone();
         let remote_addr = stream.remote_addr();
 
         #[cfg(feature = "h2")]
@@ -226,7 +242,14 @@ impl Service<&AddrStream> for MakeSvc {
         }
         #[cfg(not(feature = "h2"))]
         {
-            Box::pin(async move { Ok(Svc(lua, remote_addr)) })
+            Box::pin(async move {
+                Ok(Svc {
+                    lua,
+                    remote_addr,
+                    handler,
+                    exception,
+                })
+            })
         }
     }
 }

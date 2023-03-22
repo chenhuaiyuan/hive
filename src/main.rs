@@ -133,12 +133,18 @@ async fn lua_run(args: Args) -> WebResult<()> {
         SocketAddr::new(IpAddr::V6(localhost.parse()?), port)
     };
     println!("Listening on http://{addr}");
-    lua.set_named_registry_value("http_handler", handler.get::<_, LuaFunction>("serve")?)?;
-    lua.set_named_registry_value("exception", handler.get::<_, LuaFunction>("exception")?)?;
+    // lua.set_named_registry_value("http_handler", handler.get::<_, LuaFunction>("serve")?)?;
+    let http_handler = lua.create_registry_value(handler.get::<_, LuaFunction>("serve")?)?;
+    let http_handler = Arc::new(http_handler);
+    // lua.set_named_registry_value("exception", handler.get::<_, LuaFunction>("exception")?)?;
+    let exception = lua.create_registry_value(handler.get::<_, LuaFunction>("exception")?)?;
+    let exception = Arc::new(exception);
     if args.dev {
-        let server = Server::bind(&addr)
-            .executor(LocalExec)
-            .serve(MakeSvc(lua.clone()));
+        let server = Server::bind(&addr).executor(LocalExec).serve(MakeSvc {
+            lua: lua.clone(),
+            handler: http_handler,
+            exception,
+        });
         let local = tokio::task::LocalSet::new();
         #[cfg(feature = "lua_hotfix")]
         {
@@ -153,9 +159,11 @@ async fn lua_run(args: Args) -> WebResult<()> {
             local.run_until(server).await.unwrap();
         }
     } else {
-        let server = Server::bind(&addr)
-            .executor(LocalExec)
-            .serve(MakeSvc(lua.clone()));
+        let server = Server::bind(&addr).executor(LocalExec).serve(MakeSvc {
+            lua: lua.clone(),
+            handler: http_handler,
+            exception,
+        });
         let local = tokio::task::LocalSet::new();
         local.run_until(server).await.unwrap();
     }
