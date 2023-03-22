@@ -1,5 +1,5 @@
 use crate::error::{Error as WebError, Result};
-#[cfg(feature = "lua")]
+#[cfg(feature = "lua_file_data")]
 use crate::lua::file_data::FileData;
 use http::{header, HeaderMap, HeaderValue, Method};
 use hyper::{body::Bytes, Body, Request as HyperRequest};
@@ -118,6 +118,7 @@ impl Request {
         Ok(param)
     }
 
+    #[cfg(feature = "lua_file_data")]
     pub async fn form<T, F1, F2, F3>(self, file_func: F1, f1: F2, f2: F3) -> Result<HttpData<T>>
     where
         T: Clone,
@@ -161,6 +162,73 @@ impl Request {
                     FileData::new(field_name.clone(), file_name, content_type, field_data);
                 param = file_func(param, field_name, file)?;
             } else if let Some(field_name) = name {
+                let data: JsonValue = JsonValue::from(field_data);
+                let left_square_bracket: Option<usize> = field_name.find('[');
+                if let Some(l) = left_square_bracket {
+                    let param_name: Option<&str> = field_name.get(0..l);
+                    if let Some(param_key) = param_name {
+                        let right_square_bracket: Option<usize> = field_name.rfind(']');
+                        if let Some(r) = right_square_bracket {
+                            let field_str: Option<&str> = field_name.get((l + 1)..r);
+                            if let Some(field_str) = field_str {
+                                let fields: Vec<&str> = field_str.split("][").collect();
+                                let fields: Vec<String> =
+                                    fields.iter().map(|v| v.to_string()).collect();
+                                param = f1(param, param_key.to_string(), fields, data)?;
+                            } else {
+                                return Err(WebError::new(
+                                    5031,
+                                    "The transmitted parameters are incorrect",
+                                ));
+                            }
+                        } else {
+                            return Err(WebError::new(
+                                5031,
+                                "The transmitted parameters are incorrect",
+                            ));
+                        }
+                    }
+                } else {
+                    param = f2(param, field_name, data)?;
+                }
+            }
+        }
+        Ok(param)
+    }
+
+    #[cfg(not(feature = "lua_file_data"))]
+    pub async fn form<T, F1, F2>(self, f1: F1, f2: F2) -> Result<HttpData<T>>
+    where
+        T: Clone,
+        F1: Fn(HttpData<T>, String, Vec<String>, JsonValue) -> Result<HttpData<T>>,
+        F2: Fn(HttpData<T>, String, JsonValue) -> Result<HttpData<T>>,
+    {
+        let mut param: HttpData<T> = HttpData::new();
+        if !has_content_type(self.req.headers(), &mime::MULTIPART_FORM_DATA) {
+            return Ok(param);
+        }
+        let boundary: Option<String> = self
+            .req
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|ct| ct.to_str().ok())
+            .and_then(|ct| multer::parse_boundary(ct).ok());
+
+        if boundary.is_none() {
+            return Err(WebError::new(5041, "no multipart boundary was found"));
+        }
+
+        let mut multipart: Multipart = Multipart::new(self.req.into_body(), boundary.unwrap());
+
+        while let Some(mut field) = multipart.next_field().await? {
+            let name: Option<String> = field.name().map(|v| v.to_string());
+
+            let mut field_data: Vec<u8> = Vec::new();
+            while let Some(field_chunk) = field.chunk().await? {
+                field_data.append(&mut field_chunk.to_vec());
+            }
+
+            if let Some(field_name) = name {
                 let data: JsonValue = JsonValue::from(field_data);
                 let left_square_bracket: Option<usize> = field_name.find('[');
                 if let Some(l) = left_square_bracket {

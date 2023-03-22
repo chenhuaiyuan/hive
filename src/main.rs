@@ -1,5 +1,6 @@
 mod error;
 mod file_data;
+#[cfg(feature = "create_object")]
 mod init_project;
 #[cfg(feature = "js")]
 mod js;
@@ -11,11 +12,16 @@ mod request;
 use crate::error::create_error;
 
 use crate::error::Result as WebResult;
+#[cfg(feature = "create_object")]
 use crate::init_project::create_project;
-#[cfg(feature = "lua")]
+#[cfg(feature = "mysql")]
 use crate::lua::mysql_async::create_mysql;
 // use crate::lua::mysql_sqlx::create_sqlx;
-#[cfg(feature = "lua")]
+#[cfg(feature = "lua_file_data")]
+use crate::lua::file_data::FileData;
+#[cfg(feature = "lua_json")]
+use crate::lua::json::{create_empty_array, create_lua_value_to_json_string};
+#[cfg(feature = "lua_hotfix")]
 use crate::lua::notify::async_watch;
 #[cfg(feature = "lua")]
 use crate::lua::server::create_server;
@@ -23,12 +29,8 @@ use crate::lua::server::create_server;
 use crate::lua::service::MakeSvc;
 #[cfg(feature = "ws")]
 use crate::lua::ws::create_message;
-#[cfg(feature = "lua")]
-use crate::lua::{
-    file_data::FileData,
-    json::{create_empty_array, create_lua_value_to_json_string},
-};
 use clap::Parser;
+#[cfg(feature = "hive_log")]
 use fast_log::{
     config::Config,
     consts::LogSize,
@@ -95,8 +97,11 @@ async fn lua_run(args: Args) -> WebResult<()> {
 
     let hive: LuaTable = lua.create_table()?;
 
+    #[cfg(feature = "lua_json")]
     hive.set("to_json", create_lua_value_to_json_string(&lua)?)?;
+    #[cfg(feature = "lua_json")]
     hive.set("empty_array", create_empty_array(&lua)?)?;
+    #[cfg(feature = "lua_file_data")]
     hive.set("file_data", lua.create_proxy::<FileData>()?)?;
     hive.set("web_error", create_error(&lua)?)?;
     if let Some(ref custom_params) = args.custom_params {
@@ -110,6 +115,7 @@ async fn lua_run(args: Args) -> WebResult<()> {
     hive.set("server", create_server(&lua)?)?;
     #[cfg(feature = "ws")]
     hive.set("ws_message", create_message(&lua)?)?;
+    #[cfg(feature = "mysql")]
     hive.set("mysql", create_mysql(&lua)?)?;
     hive.set("router", create_router(&lua)?)?;
     globals.set("hive", hive)?;
@@ -134,11 +140,18 @@ async fn lua_run(args: Args) -> WebResult<()> {
             .executor(LocalExec)
             .serve(MakeSvc(lua.clone()));
         let local = tokio::task::LocalSet::new();
-        let j = tokio::join! {
-            async_watch(lua.clone(), args.clone()),
-            local.run_until(server)
-        };
-        j.0.unwrap();
+        #[cfg(feature = "lua_hotfix")]
+        {
+            let j = tokio::join! {
+                async_watch(lua.clone(), args.clone()),
+                local.run_until(server)
+            };
+            j.0.unwrap();
+        }
+        #[cfg(not(feature = "lua_hotfix"))]
+        {
+            local.run_until(server).await.unwrap();
+        }
     } else {
         let server = Server::bind(&addr)
             .executor(LocalExec)
@@ -180,9 +193,8 @@ async fn v8_run(args: Args) -> WebResult<()> {
     Ok(())
 }
 
-// #[tokio::main(flavor = "multi_thread")]
-fn main() -> WebResult<()> {
-    let args = Args::parse();
+#[cfg(feature = "hive_log")]
+fn hive_logs(args: &Args) -> WebResult<()> {
     if args.dev {
         fast_log::init(Config::new().console().file_split(
             "logs/",
@@ -191,8 +203,15 @@ fn main() -> WebResult<()> {
             ZipPacker {},
         ))?;
         log::info!("env: dev mode");
-    } else if let Some(object_name) = args.create {
-        create_project(object_name)?;
+    } else if let Some(_object_name) = &args.create {
+        #[cfg(feature = "create_object")]
+        {
+            create_project(_object_name)?;
+        }
+        #[cfg(not(feature = "create_object"))]
+        {
+            println!("没有开启此功能");
+        }
         return Ok(());
     } else {
         fast_log::init(Config::new().file_split(
@@ -202,6 +221,16 @@ fn main() -> WebResult<()> {
             ZipPacker {},
         ))?;
     }
+    Ok(())
+}
+
+// #[tokio::main(flavor = "multi_thread")]
+fn main() -> WebResult<()> {
+    let args = Args::parse();
+
+    #[cfg(feature = "hive_log")]
+    hive_logs(&args)?;
+
     log::info!("app start...");
 
     #[cfg(feature = "lua")]

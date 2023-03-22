@@ -2,7 +2,9 @@ use std::fmt;
 #[cfg(feature = "lua")]
 use std::sync::Arc;
 
+#[cfg(feature = "create_object")]
 use downloader::Error as DownloaderError;
+#[cfg(feature = "hive_log")]
 use fast_log::error::LogError;
 use hyper::Error as HyperError;
 
@@ -10,6 +12,7 @@ use http::Error as HttpError;
 #[cfg(feature = "lua")]
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use multer::Error as MulterError;
+#[cfg(feature = "lua_hotfix")]
 use notify::Error as NotifyError;
 use std::io::Error as IoError;
 use std::net::AddrParseError;
@@ -17,6 +20,7 @@ use std::path::StripPrefixError;
 use std::string::FromUtf8Error;
 #[cfg(feature = "js")]
 use v8::DataError as V8DataError;
+#[cfg(feature = "create_object")]
 use zip::result::ZipError;
 
 #[derive(Debug)]
@@ -89,24 +93,28 @@ impl From<AddrParseError> for Error {
     }
 }
 
+#[cfg(feature = "hive_log")]
 impl From<LogError> for Error {
     fn from(value: LogError) -> Self {
         Self::new(2005, value.to_string())
     }
 }
 
+#[cfg(feature = "lua_hotfix")]
 impl From<NotifyError> for Error {
     fn from(value: NotifyError) -> Self {
         Self::new(2006, value.to_string())
     }
 }
 
+#[cfg(feature = "create_object")]
 impl From<DownloaderError> for Error {
     fn from(value: DownloaderError) -> Self {
         Self::new(2007, value.to_string())
     }
 }
 
+#[cfg(feature = "create_object")]
 impl From<ZipError> for Error {
     fn from(value: ZipError) -> Self {
         Self::new(2007, value.to_string())

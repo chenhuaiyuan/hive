@@ -3,15 +3,28 @@
 尝试打造一个rust + lua的 web framework。
 后期尝试结合更多语言
 
-## features
+## 功能
 
 - [ ] http2.0支持
 - [x] lua dev 模式下自动热更新
-- [ ] lua release 模式下热更新
+- [ ] lua release 模式下重载
 - [x] websocket(可以使用，还有需要优化的地方)
 - [ ] js支持（使用v8引擎）
-- [ ] 允许js调用rust、c/c++等静态语言生成的动态库
-- [ ] 允许调用node库
+
+## feature
+
+默认只开启lua特性
+
+| feature       | 功能                | 开启方法:                       |
+| ------------- | ------------------ | ------------------------------ |
+| lua_hotfix    | 开启dev模式下热更新   | --features "lua lua_hotfix"    |
+| ws            | 开启websocket功能    | --features "lua ws"            |
+| mysql         | 开启mysql功能        | --features "lua mysql"         |
+| h2            | 开启http2功能(未完成) | --features "lua h2"            |
+| create_object | 允许使用--create命令  | --features "lua create_object" |
+| hive_log      | 开启log功能          | --features "lua hive_log"      |
+| lua_file_data | 开启此功能可以实现上传和下载文件功能，如果不使用上传和下载功能，可以不用开启，使form表单提交速度更快 | --features "lua lua_file_data" |
+| lua_json      | 开启json功能         | --features "lua lua_json"      |
 
 ## 自带库安装
 

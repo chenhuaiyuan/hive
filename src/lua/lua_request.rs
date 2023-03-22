@@ -127,6 +127,7 @@ impl LuaUserData for LuaRequest {
         });
         _methods.add_async_function("form", |lua, this: LuaAnyUserData| async move {
             let this: LuaRequest = this.take::<Self>()?;
+            #[cfg(feature = "lua_file_data")]
             let file_func = |mut param: HttpData<LuaValue<'lua>>, field_name, file| {
                 param.insert(field_name, LuaValue::UserData(lua.create_userdata(file)?));
                 Ok(param)
@@ -151,8 +152,12 @@ impl LuaUserData for LuaRequest {
                 param.insert(field_name, data);
                 Ok(param)
             };
+            #[cfg(feature = "lua_file_data")]
             let params: std::collections::HashMap<String, LuaValue> =
                 this.0.form(file_func, f1, f2).await.to_lua_err()?;
+            #[cfg(not(feature = "lua_file_data"))]
+            let params: std::collections::HashMap<String, LuaValue> =
+                this.0.form(f1, f2).await.to_lua_err()?;
             Ok(params)
         });
         #[cfg(feature = "ws")]
