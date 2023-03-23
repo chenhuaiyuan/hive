@@ -14,6 +14,7 @@ use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use multer::Error as MulterError;
 #[cfg(feature = "lua_hotfix")]
 use notify::Error as NotifyError;
+use serde_json::Error as JsonError;
 use std::io::Error as IoError;
 use std::net::AddrParseError;
 use std::path::StripPrefixError;
@@ -155,5 +156,11 @@ impl From<HttpError> for Error {
 impl From<V8DataError> for Error {
     fn from(value: V8DataError) -> Self {
         Self::new(2007, value.to_string())
+    }
+}
+
+impl From<JsonError> for Error {
+    fn from(value: JsonError) -> Self {
+        Self::new(2008, value.to_string())
     }
 }

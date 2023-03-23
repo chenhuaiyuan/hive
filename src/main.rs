@@ -19,8 +19,7 @@ use crate::lua::mysql_async::create_mysql;
 // use crate::lua::mysql_sqlx::create_sqlx;
 #[cfg(feature = "lua_file_data")]
 use crate::lua::file_data::FileData;
-#[cfg(feature = "lua_json")]
-use crate::lua::json::{create_empty_array, create_lua_value_to_json_string};
+use crate::lua::json::create_empty_array;
 #[cfg(feature = "lua_hotfix")]
 use crate::lua::notify::async_watch;
 #[cfg(feature = "lua")]
@@ -88,7 +87,7 @@ fn custom_params_parse(lua: &Lua, params: String) -> LuaResult<LuaTable> {
 
 #[cfg(feature = "lua")]
 async fn lua_run(args: Args) -> WebResult<()> {
-    use crate::lua::router::create_router;
+    use crate::lua::{response::HiveResponseBuilder, router::create_router};
 
     let lua: Arc<Lua> = unsafe { Arc::new(Lua::unsafe_new()) };
 
@@ -97,9 +96,6 @@ async fn lua_run(args: Args) -> WebResult<()> {
 
     let hive: LuaTable = lua.create_table()?;
 
-    #[cfg(feature = "lua_json")]
-    hive.set("to_json", create_lua_value_to_json_string(&lua)?)?;
-    #[cfg(feature = "lua_json")]
     hive.set("empty_array", create_empty_array(&lua)?)?;
     #[cfg(feature = "lua_file_data")]
     hive.set("file_data", lua.create_proxy::<FileData>()?)?;
@@ -118,6 +114,7 @@ async fn lua_run(args: Args) -> WebResult<()> {
     #[cfg(feature = "mysql")]
     hive.set("mysql", create_mysql(&lua)?)?;
     hive.set("router", create_router(&lua)?)?;
+    hive.set("response", lua.create_proxy::<HiveResponseBuilder>()?)?;
     globals.set("hive", hive)?;
 
     let file: Vec<u8> = fs::read(args.file.clone()).expect("read file failed");
@@ -133,10 +130,8 @@ async fn lua_run(args: Args) -> WebResult<()> {
         SocketAddr::new(IpAddr::V6(localhost.parse()?), port)
     };
     println!("Listening on http://{addr}");
-    // lua.set_named_registry_value("http_handler", handler.get::<_, LuaFunction>("serve")?)?;
     let http_handler = lua.create_registry_value(handler.get::<_, LuaFunction>("serve")?)?;
     let http_handler = Arc::new(http_handler);
-    // lua.set_named_registry_value("exception", handler.get::<_, LuaFunction>("exception")?)?;
     let exception = lua.create_registry_value(handler.get::<_, LuaFunction>("exception")?)?;
     let exception = Arc::new(exception);
     if args.dev {

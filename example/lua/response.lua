@@ -1,4 +1,5 @@
 local response = {}
+local hive_response = hive.response
 
 function response.json(data, is_object)
   local body
@@ -11,15 +12,12 @@ function response.json(data, is_object)
       body = hive.empty_array()
     end
   else
-    body = hive.to_json(data)
+    -- body = hive.to_json(data)
+    body = data
   end
-  return {
-    ['status'] = 200,
-    ['headers'] = {
-      ['Content-type'] = 'application/json'
-    },
-    ['body'] = body
-  }
+  return hive_response.new():status(200):headers({
+    ['Content-type'] = 'application/json'
+  }):body(body)
 end
 
 function response.success(data, code, message)
@@ -35,9 +33,9 @@ function response.success(data, code, message)
     if data.data ~= nil then
       if type(data.data) == 'table' and next(data.data) == nil then
         data.data = hive.empty_array()
-      elseif next(data) == nil then
-        data = hive.empty_array()
       end
+    elseif next(data) == nil then
+      data = hive.empty_array()
     end
   end
 
@@ -54,33 +52,35 @@ function response.fail(code, message, data)
 end
 
 function response.html(body)
-  return {
-    ['status'] = 200,
-    ['headers'] = {
-      ['Content-type'] = 'text/html'
-    },
-    ['body'] = body
-  }
+  return hive_response.new():headers({
+    ['Content-type'] = 'text/html'
+  }):status(200):body(body)
 end
 
 function response.pay_success()
-  return {
-    ['status'] = 200,
-    ['headers'] = {
-      ['Content-type'] = 'text/plain'
-    },
-    ['body'] = 'success'
-  }
+  return hive_response.new():status(200):headers({
+    ['Content-type'] = 'text/plain'
+  }):body('success')
+  -- return {
+  --   ['status'] = 200,
+  --   ['headers'] = {
+  --     ['Content-type'] = 'text/plain'
+  --   },
+  --   ['body'] = 'success'
+  -- }
 end
 
 function response.pay_fail()
-  return {
-    ['status'] = 200,
-    ['headers'] = {
-      ['Content-type'] = 'text/plain'
-    },
-    ['body'] = ''
-  }
+  return hive_response.new():status(200):headers({
+    ['Content-type'] = 'text/plain'
+  }):body('')
+  -- return {
+  --   ['status'] = 200,
+  --   ['headers'] = {
+  --     ['Content-type'] = 'text/plain'
+  --   },
+  --   ['body'] = ''
+  -- }
 end
 
 return response

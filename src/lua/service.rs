@@ -1,5 +1,6 @@
 use super::lua_request::LuaRequest;
 use crate::error::Error as WebError;
+use crate::lua::response::HiveResponse;
 use futures_util::Future;
 
 #[cfg(feature = "h2")]
@@ -49,7 +50,6 @@ impl Service<Request<Body>> for Svc {
         );
 
         Box::pin(async move {
-            // let handler: LuaFunction = lua.named_registry_value("http_handler")?;
             let handler: LuaFunction = lua.registry_value(&handler)?;
 
             match handler
@@ -57,97 +57,33 @@ impl Service<Request<Body>> for Svc {
                 .await
             {
                 Ok(lua_resp) => match lua_resp {
-                    LuaValue::Integer(v) => Ok(Response::new(Body::from(v.to_string()))),
-                    LuaValue::Number(v) => Ok(Response::new(Body::from(v.to_string()))),
-                    LuaValue::String(v) => Ok(Response::new(Body::from(v.to_str()?.to_string()))),
-                    LuaValue::Table(v) => {
-                        let status: u16 = v
-                            .get::<_, Option<u16>>("status")
-                            .to_lua_err()?
-                            .unwrap_or(200);
-                        let mut resp: http::response::Builder = Response::builder().status(status);
-
-                        // let version: Option<String> =
-                        //     v.get::<_, Option<String>>("version").to_lua_err()?;
-                        // if let Some(ver) = version {
-                        //     if ver == "HTTP/0.9" {
-                        //         resp = resp.version(Version::HTTP_09);
-                        //     } else if ver == "HTTP/1.0" {
-                        //         resp = resp.version(Version::HTTP_10);
-                        //     } else if ver == "HTTP/1.1" {
-                        //         resp = resp.version(Version::HTTP_11);
-                        //     } else if ver == "HTTP/2.0" {
-                        //         resp = resp.version(Version::HTTP_2);
-                        //     } else if ver == "HTTP/3.0" {
-                        //         resp = resp.version(Version::HTTP_3);
-                        //     }
-                        // }
-
-                        if let Some(headers) =
-                            v.get::<_, Option<LuaTable>>("headers").to_lua_err()?
-                        {
-                            for pair in headers.pairs::<String, LuaString>() {
-                                let (h, v) = pair.to_lua_err()?;
-                                resp = resp.header(&h, v.as_bytes());
-                            }
-                        }
-
-                        let body = v
-                            .get::<_, Option<LuaString>>("body")
-                            .to_lua_err()?
-                            .map(|b| Body::from(b.as_bytes().to_vec()))
-                            .unwrap_or_else(Body::empty);
-
-                        Ok(resp.body(body).unwrap())
+                    LuaValue::UserData(v) => {
+                        let resp = v.take::<HiveResponse<Body>>()?;
+                        Ok(resp.0)
                     }
-                    _ => Ok(Response::new(Body::empty())),
+                    _ => {
+                        let body = serde_json::to_vec(&lua_resp)?;
+                        let resp = Response::new(Body::from(body));
+                        Ok(resp)
+                    }
                 },
                 Err(err) => {
                     println!("{err:?}");
-                    // let exception: LuaFunction = lua.named_registry_value("exception")?;
                     let exception: LuaFunction = lua.registry_value(&exception)?;
                     let (code, message) = return_err_info(err);
                     log::error!("{}", message);
                     let resp = exception.call_async::<_, LuaValue>((code, message)).await?;
                     match resp {
-                        LuaValue::Integer(v) => Ok(Response::new(Body::from(v.to_string()))),
-                        LuaValue::Number(v) => Ok(Response::new(Body::from(v.to_string()))),
-                        LuaValue::String(v) => {
-                            Ok(Response::new(Body::from(v.to_str()?.to_string())))
+                        LuaValue::UserData(v) => {
+                            let resp = v.take::<HiveResponse<Body>>()?;
+                            Ok(resp.0)
                         }
-                        LuaValue::Table(v) => {
-                            let status = v
-                                .get::<_, Option<u16>>("status")
-                                .to_lua_err()?
-                                .unwrap_or(200);
-                            let mut resp = Response::builder().status(status);
-
-                            if let Some(headers) =
-                                v.get::<_, Option<LuaTable>>("headers").to_lua_err()?
-                            {
-                                for pair in headers.pairs::<String, LuaString>() {
-                                    let (h, v) = pair.to_lua_err()?;
-                                    resp = resp.header(&h, v.as_bytes());
-                                }
-                            }
-
-                            let body: Body = v
-                                .get::<_, Option<LuaString>>("body")
-                                .to_lua_err()?
-                                .map(|b| Body::from(b.as_bytes().to_vec()))
-                                .unwrap_or_else(Body::empty);
-
-                            Ok(resp.body(body).unwrap())
+                        _ => {
+                            let body = serde_json::to_vec(&resp)?;
+                            let resp = Response::new(Body::from(body));
+                            Ok(resp)
                         }
-                        _ => Ok(Response::new(Body::empty())),
                     }
-                    // Ok(Response::builder()
-                    //     .status(200)
-                    //     .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
-                    //     .body(Body::from(format!(
-                    //         r#"{{"code": {code}, "message": "{message}", "data": ""}}"#
-                    //     )))
-                    //     .unwrap())
                 }
             }
         })

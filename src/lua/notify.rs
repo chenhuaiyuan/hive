@@ -11,7 +11,7 @@ use crate::Args;
 fn async_watcher() -> notify::Result<(RecommendedWatcher, Receiver<notify::Result<Event>>)> {
     let (tx, rx) = channel(1);
 
-    let watcher: notify::FsEventWatcher = RecommendedWatcher::new(
+    let watcher = RecommendedWatcher::new(
         move |res| {
             Runtime::new().unwrap().block_on(async {
                 tx.send(res).await.unwrap();

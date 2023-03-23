@@ -23,28 +23,38 @@ local function exec(method, path, req)
       is_pass, params._user_info = handler.middleware(req)
       if not is_pass then
         local res = { code = 5001, message = 'Failed to verify token', data = '' }
-        return {
-          ['status'] = 200,
-          ['headers'] = {
-            ['Content-type'] = 'application/json'
-          },
-          ['body'] = hive.to_json(res)
-        }
+        return hive.response.new():status(200):headers({
+          ['Content-type'] = 'application/json'
+        }):body(res)
+        -- return {
+        --   ['status'] = 200,
+        --   ['headers'] = {
+        --     ['Content-type'] = 'application/json'
+        --   },
+        --   ['body'] = hive.to_json(res)
+        -- }
       end
     end
     return handler.func(params)
   else
-    return {
-      ['status'] = 404,
-      ['headers'] = {
-        ['Content-type'] = 'application/json'
-      },
-      ['body'] = hive.to_json({
-        ['code'] = 404,
-        ['data'] = '',
-        ['message'] = 'not found'
-      })
-    }
+    return hive.response.new():status(404):headers({
+      ['Content-type'] = 'application/json'
+    }):body({
+      ['code'] = 404,
+      ['data'] = '',
+      ['message'] = 'Not Found'
+    })
+    -- return {
+    --   ['status'] = 404,
+    --   ['headers'] = {
+    --     ['Content-type'] = 'application/json'
+    --   },
+    --   ['body'] = hive.to_json({
+    --     ['code'] = 404,
+    --     ['data'] = '',
+    --     ['message'] = 'not found'
+    --   })
+    -- }
   end
 end
 

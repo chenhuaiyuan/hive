@@ -13,7 +13,7 @@
 
 ## feature
 
-默认只开启lua特性，如果只开启lua特性，生成的程序小于2M。
+默认只开启lua特性
 
 | feature       | 功能                | 开启方法:                       |
 | ------------- | ------------------ | ------------------------------ |
@@ -24,7 +24,6 @@
 | create_object | 允许使用--create命令  | --features "lua create_object" |
 | hive_log      | 开启log功能          | --features "lua hive_log"      |
 | lua_file_data | 开启此功能可以实现上传和下载文件功能，如果不使用上传和下载功能，可以不用开启，使form表单提交速度更快 | --features "lua lua_file_data" |
-| lua_json      | 开启json功能         | --features "lua lua_json"      |
 
 ## 自带库安装
 
