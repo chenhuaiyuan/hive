@@ -37,6 +37,7 @@ end
 
 function orm.new(user, pass, host, database)
   if database ~= nil then
+    orm._database = database
     MYSQL = hive.mysql.new(user or MYSQL_USER, pass or MYSQL_PASS, host or MYSQL_HOST, database)
   else
     MYSQL = hive.mysql.new(user or MYSQL_USER, pass or MYSQL_PASS, host or MYSQL_HOST)
@@ -103,11 +104,12 @@ end
 ---@param ... any
 ---@return table
 function orm:columns(...)
-  local columns = {...}
+  local columns = { ... }
   for i, val in ipairs(columns) do
-    local as_exist = find(val, 'as')
+    local as_exist = find(val, ' as ')
     local bracket_exist = find(val, '%(')
-    if as_exist == nil and bracket_exist == nil then
+    local dot_exist = find(val, '%.')
+    if as_exist == nil and bracket_exist == nil and dot_exist == nil then
       columns[i] = '`' .. columns[i] .. '`'
     end
   end
@@ -116,7 +118,7 @@ function orm:columns(...)
 end
 
 function orm:raw_columns(...)
-  self._columns = {...}
+  self._columns = { ... }
   return self
 end
 
@@ -366,7 +368,7 @@ function orm:order_by(field, sort)
   if nil == sort then
     self._order_by = ' ORDER BY ' .. field .. ' ASC '
   else
-    self._order_by = ' ORDER BY ' .. field .. sort .. ' '
+    self._order_by = ' ORDER BY ' .. field .. ' ' .. sort .. ' '
   end
   return self
 end
@@ -436,7 +438,11 @@ function orm:find(...)
   end
 
   if self._database ~= '' then
-    sql = sql .. ' FROM `' .. self._database .. '`.' .. self._table .. ' '
+    if self._join == nil then
+      sql = sql .. ' FROM `' .. self._database .. '`.' .. self._table .. ' '
+    else
+      sql = sql .. ' FROM ' .. self._database .. '.' .. self._table .. ' '
+    end
   else
     sql = sql .. ' FROM ' .. self._table .. ' '
   end
@@ -511,9 +517,12 @@ function orm:find_all(...)
   else
     sql = 'SELECT * '
   end
-
   if self._database ~= '' then
-    sql = sql .. ' FROM `' .. self._database .. '`.' .. self._table .. ' '
+    if self._join == nil then
+      sql = sql .. ' FROM `' .. self._database .. '`.' .. self._table .. ' '
+    else
+      sql = sql .. ' FROM ' .. self._database .. '.' .. self._table .. ' '
+    end
   else
     sql = sql .. ' FROM ' .. self._table .. ' '
   end
@@ -557,7 +566,7 @@ function orm:insert(data)
     sql = sql .. self._table .. ' ('
   end
   for key, val in pairs(data) do
-    sql = sql .. key .. ','
+    sql = sql .. '`' .. key .. '`,'
     if type(val) == 'string' and val:upper() == 'NULL' then
       values = values .. 'NULL,'
     else

@@ -4,6 +4,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::error::Error as WebError;
+use crate::lua::response::HiveResponse;
+use http::Response;
+use hyper::Body;
 use mlua::prelude::*;
 use nanoid::nanoid;
 use tokio::fs;
@@ -37,18 +40,14 @@ impl FileData {
 #[cfg(feature = "lua")]
 impl LuaUserData for FileData {
     fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(_fields: &mut F) {
-        _fields.add_field_method_get("field_name", |lua, this| {
-            lua.create_string(&this.field_name)
-        });
-        _fields.add_field_method_get("file_name", |lua, this| lua.create_string(&this.file_name));
-        _fields.add_field_method_get("content_type", |lua, this| {
-            lua.create_string(&this.content_type)
-        });
+        _fields.add_field_method_get("field_name", |_, this| Ok(this.field_name.clone()));
+        _fields.add_field_method_get("file_name", |_, this| Ok(this.file_name.clone()));
+        _fields.add_field_method_get("content_type", |_, this| Ok(this.content_type.clone()));
     }
     fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(_methods: &mut M) {
         _methods.add_async_function(
             "save",
-            |lua, (this, path): (LuaAnyUserData, LuaMultiValue)| async move {
+            |_, (this, path): (LuaAnyUserData, LuaMultiValue)| async move {
                 let alphabet = [
                     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f',
                     'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v',
@@ -67,10 +66,9 @@ impl LuaUserData for FileData {
                         let mut file: fs::File =
                             fs::File::create(&new_file_name).await.to_lua_err()?;
                         file.write_all(&this.content).await.to_lua_err()?;
-                        let file_name: LuaString = lua.create_string(&new_file_name)?;
-                        return Ok((true, file_name));
+                        return Ok((true, new_file_name));
                     }
-                    return Ok((false, lua.create_string(&"")?));
+                    return Ok((false, "".to_string()));
                 }
                 let path: Vec<LuaValue> = path.into_vec();
                 let path_len = path.len();
@@ -101,10 +99,9 @@ impl LuaUserData for FileData {
                             fs::File::create(&new_file_name).await.to_lua_err()?;
                         file.write_all(&this.content).await.to_lua_err()?;
                         let f_name: &str = new_file_name.to_str().unwrap_or("");
-                        let file_name: LuaString = lua.create_string(&f_name)?;
-                        return Ok((true, file_name));
+                        return Ok((true, f_name.to_string()));
                     } else {
-                        return Ok((false, lua.create_string(&"")?));
+                        return Ok((false, "".to_string()));
                     }
                 } else if path_len >= 2 {
                     if let LuaValue::String(v) = &path[0] {
@@ -131,16 +128,15 @@ impl LuaUserData for FileData {
                             file.write_all(&this.content).await.to_lua_err()?;
 
                             let f_name: &str = new_file_name.to_str().unwrap_or("");
-                            let file_name: LuaString = lua.create_string(&f_name)?;
-                            return Ok((true, file_name));
+                            return Ok((true, f_name.to_string()));
                         } else {
-                            return Ok((false, lua.create_string(&"")?));
+                            return Ok((false, "".to_string()));
                         }
                     } else {
-                        return Ok((false, lua.create_string(&"")?));
+                        return Ok((false, "".to_string()));
                     }
                 }
-                Ok((false, lua.create_string(&"")?))
+                Ok((false, "".to_string()))
             },
         );
         _methods.add_async_function("new", |_, file_path: String| async move {
@@ -178,88 +174,48 @@ impl LuaUserData for FileData {
                 ))))
             }
         });
-        _methods.add_async_function("get_file", |lua, this: LuaAnyUserData| async move {
-            let table: LuaTable = lua.create_table()?;
-            let headers: LuaTable = lua.create_table()?;
+        _methods.add_async_function("get_file", |_, this: LuaAnyUserData| async move {
             let this: FileData = this.take::<Self>()?;
-            table.set("status", LuaValue::Integer(200))?;
+            let mut builder = Response::builder().status(200);
             if this.content_type == "txt" {
-                let s: LuaString = lua.create_string(&"text/plain")?;
-                headers.set("Content-Type", LuaValue::String(s))?;
+                builder = builder.header("Content-Type", "text/plain");
             } else if this.content_type == "html" {
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string(&"text/html")?),
-                )?;
+                builder = builder.header("Content-Type", "text/html");
             } else if this.content_type == "xml" {
-                // headers.set("Content-Type", Lua.create_string("text/xml")?)?;
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string("application/xml")?),
-                )?;
+                builder = builder.header("Content-Type", "application/xml");
             } else if this.content_type == "gif" {
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string("image/gif")?),
-                )?;
+                builder = builder.header("Content-Type", "image/gif");
             } else if this.content_type == "jpeg" || this.content_type == "jpg" {
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string("image/jpeg")?),
-                )?;
+                builder = builder.header("Content-Type", "image/jpeg");
             } else if this.content_type == "png" {
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string("image/png")?),
-                )?;
+                builder = builder.header("Content-Type", "image/png");
             } else if this.content_type == "xhtml" {
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string("application/xhtml+xml")?),
-                )?;
+                builder = builder.header("Content-Type", "application/xhtml+xml");
             } else if this.content_type == "json" {
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string("application/json")?),
-                )?;
+                builder = builder.header("Content-Type", "application/json");
             } else if this.content_type == "pdf" {
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string("application/pdf")?),
-                )?;
+                builder = builder.header("Content-Type", "application/pdf");
             } else if this.content_type == "docx" {
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string("application/msword")?),
-                )?;
+                builder = builder.header("Content-Type", "application/msword");
             } else {
-                headers.set(
-                    "Content-Type",
-                    LuaValue::String(lua.create_string("application/octet-stream")?),
-                )?;
+                builder = builder.header("Content-Type", "application/octet-stream");
             }
-            table.set("headers", headers)?;
-            table.set("body", LuaValue::String(lua.create_string(&this.content)?))?;
-            Ok(table)
+            let resp = builder.body(Body::from(this.content)).to_lua_err()?;
+
+            Ok(HiveResponse(resp))
         });
-        _methods.add_async_function("download", |lua, this: LuaAnyUserData| async move {
-            let table: LuaTable = lua.create_table()?;
-            let headers: LuaTable = lua.create_table()?;
+        _methods.add_async_function("download", |_, this: LuaAnyUserData| async move {
             let this: FileData = this.take::<Self>()?;
-            table.set("status", LuaValue::Integer(200))?;
-            headers.set(
-                "Content-Type",
-                LuaValue::String(lua.create_string("application/octet-stream")?),
-            )?;
-            headers.set(
-                "Content-Disposition",
-                LuaValue::String(
-                    lua.create_string(&format!(r#"attachment; filename="{}""#, this.file_name))?,
-                ),
-            )?;
-            table.set("headers", headers)?;
-            table.set("body", LuaValue::String(lua.create_string(&this.content)?))?;
-            Ok(table)
+            let data = Response::builder()
+                .status(200)
+                .header("Content-Type", "application/octet-stream")
+                .header(
+                    "Content-Disposition",
+                    format!("attachment;filename={}", this.file_name),
+                )
+                .body(Body::from(this.content))
+                .to_lua_err()?;
+            Ok(HiveResponse(data))
         });
     }
 }
