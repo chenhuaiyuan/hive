@@ -1,6 +1,7 @@
 use super::lua_request::LuaRequest;
 use crate::error::Error as WebError;
 use crate::lua::response::HiveResponse;
+use crate::lua::router::HiveRouter;
 use futures_util::Future;
 
 #[cfg(feature = "h2")]
@@ -22,8 +23,9 @@ use std::task::Poll;
 pub struct Svc {
     lua: Arc<Lua>,
     remote_addr: SocketAddr,
-    handler: Arc<LuaRegistryKey>,
+    handler: Option<Arc<LuaRegistryKey>>,
     exception: Arc<LuaRegistryKey>,
+    router: Option<Arc<HiveRouter>>,
 }
 
 impl Service<Request<Body>> for Svc {
@@ -42,6 +44,7 @@ impl Service<Request<Body>> for Svc {
         let lua_req: LuaRequest = LuaRequest::new(req, self.remote_addr);
         let handler = self.handler.clone();
         let exception = self.exception.clone();
+        let router = self.router.clone();
         log::info!(
             "Request -- remote address: {}, method: {}, uri: {}",
             self.remote_addr,
@@ -50,46 +53,106 @@ impl Service<Request<Body>> for Svc {
         );
 
         Box::pin(async move {
-            let handler: LuaFunction = lua.registry_value(&handler)?;
+            let handler: Option<LuaFunction> = if let Some(_handler) = handler {
+                #[cfg(feature = "add_entrance")]
+                {
+                    Some(lua.registry_value(&_handler)?)
+                }
+                #[cfg(not(feature = "add_entrance"))]
+                {
+                    None
+                }
+            } else {
+                None
+            };
 
-            match handler
-                .call_async::<_, LuaValue>((method, path, lua_req))
-                .await
+            let exception: LuaFunction = lua.registry_value(&exception)?;
+
+            #[cfg(not(feature = "dev_mode"))]
             {
-                Ok(lua_resp) => match lua_resp {
-                    LuaValue::UserData(v) => {
-                        let resp = v.take::<HiveResponse<Body>>()?;
-                        Ok(resp.0)
+                let lua_req = lua.create_userdata(lua_req)?;
+                if let Some(router) = router {
+                    match router
+                        .execute(method, path, lua_req, exception.clone(), handler)
+                        .await
+                    {
+                        Ok(lua_resp) => match lua_resp {
+                            LuaValue::UserData(v) => {
+                                let resp = v.take::<HiveResponse<Body>>()?;
+                                Ok(resp.0)
+                            }
+                            _ => {
+                                let body = serde_json::to_vec(&lua_resp)?;
+                                let resp = Response::new(Body::from(body));
+                                Ok(resp)
+                            }
+                        },
+                        Err(err) => {
+                            println!("{err:?}");
+
+                            // let (code, message) = return_err_info(err);
+                            log::error!("{}", err.message);
+                            let resp = exception
+                                .call_async::<_, LuaValue>((err.code, err.message))
+                                .await?;
+                            match resp {
+                                LuaValue::UserData(v) => {
+                                    let resp = v.take::<HiveResponse<Body>>()?;
+                                    Ok(resp.0)
+                                }
+                                _ => {
+                                    let body = serde_json::to_vec(&resp)?;
+                                    let resp = Response::new(Body::from(body));
+                                    Ok(resp)
+                                }
+                            }
+                        }
                     }
-                    _ => {
-                        let body = serde_json::to_vec(&lua_resp)?;
-                        let resp = Response::new(Body::from(body));
-                        Ok(resp)
-                    }
-                },
-                Err(err) => {
-                    println!("{err:?}");
-                    let exception: LuaFunction = lua.registry_value(&exception)?;
-                    let (code, message) = return_err_info(err);
-                    log::error!("{}", message);
-                    let resp = exception.call_async::<_, LuaValue>((code, message)).await?;
-                    match resp {
+                } else {
+                    Ok(Response::new(Body::empty()))
+                }
+            }
+            #[cfg(feature = "dev_mode")]
+            if let Some(handler) = handler {
+                match handler.call_async((method, path, lua_req)).await {
+                    Ok(lua_resp) => match lua_resp {
                         LuaValue::UserData(v) => {
                             let resp = v.take::<HiveResponse<Body>>()?;
                             Ok(resp.0)
                         }
                         _ => {
-                            let body = serde_json::to_vec(&resp)?;
+                            let body = serde_json::to_vec(&lua_resp)?;
                             let resp = Response::new(Body::from(body));
                             Ok(resp)
                         }
+                    },
+                    Err(err) => {
+                        println!("{err:?}");
+
+                        let (code, message) = return_err_info(err);
+                        log::error!("{}", message);
+                        let resp = exception.call_async::<_, LuaValue>((code, message)).await?;
+                        match resp {
+                            LuaValue::UserData(v) => {
+                                let resp = v.take::<HiveResponse<Body>>()?;
+                                Ok(resp.0)
+                            }
+                            _ => {
+                                let body = serde_json::to_vec(&resp)?;
+                                let resp = Response::new(Body::from(body));
+                                Ok(resp)
+                            }
+                        }
                     }
                 }
+            } else {
+                Ok(Response::new(Body::empty()))
             }
         })
     }
 }
 
+#[cfg(feature = "dev_mode")]
 fn return_err_info(err: LuaError) -> (u16, String) {
     match err {
         LuaError::SyntaxError {
@@ -148,8 +211,9 @@ fn return_err_info(err: LuaError) -> (u16, String) {
 
 pub struct MakeSvc {
     pub lua: Arc<Lua>,
-    pub handler: Arc<LuaRegistryKey>,
+    pub handler: Option<Arc<LuaRegistryKey>>,
     pub exception: Arc<LuaRegistryKey>,
+    pub router: Option<Arc<HiveRouter>>,
 }
 
 impl Service<&AddrStream> for MakeSvc {
@@ -171,6 +235,7 @@ impl Service<&AddrStream> for MakeSvc {
         let handler = self.handler.clone();
         let exception = self.exception.clone();
         let remote_addr = stream.remote_addr();
+        let router = self.router.clone();
 
         #[cfg(feature = "h2")]
         {
@@ -184,6 +249,7 @@ impl Service<&AddrStream> for MakeSvc {
                     remote_addr,
                     handler,
                     exception,
+                    router,
                 })
             })
         }

@@ -17,3 +17,5 @@ pub mod ws;
 pub mod file_data;
 pub mod json;
 pub mod response;
+
+pub mod hive_func;

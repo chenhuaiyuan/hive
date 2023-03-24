@@ -12,7 +12,7 @@
       "args": [
         "-d"
       ],
-      "cwd": "${workspaceRoot}/cena_admin",
+      "cwd": "${workspaceRoot}/example/lua",
     }
   ]
 }

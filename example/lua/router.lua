@@ -13,4 +13,8 @@ function router:execute(method, path)
   return self.r:execute(method, path)
 end
 
+function router:raw()
+  return self.r
+end
+
 return router

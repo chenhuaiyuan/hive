@@ -10,8 +10,8 @@ local router = require 'route'
 -- local client = mongo.Client(MONGO)
 -- Mongo = client:getDatabase(DATABASE)
 
-
-local function exec(method, path, req)
+-- dev_exec支持热更新
+local function dev_exec(method, path, req)
   -- local remote_addr = req:remote_addr()
   -- local headers = req:headers()
   local params = { _request = req }
@@ -26,13 +26,6 @@ local function exec(method, path, req)
         return hive.response.new():status(200):headers({
           ['Content-type'] = 'application/json'
         }):body(res)
-        -- return {
-        --   ['status'] = 200,
-        --   ['headers'] = {
-        --     ['Content-type'] = 'application/json'
-        --   },
-        --   ['body'] = hive.to_json(res)
-        -- }
       end
     end
     return handler.func(params)
@@ -44,20 +37,37 @@ local function exec(method, path, req)
       ['data'] = '',
       ['message'] = 'Not Found'
     })
-    -- return {
-    --   ['status'] = 404,
-    --   ['headers'] = {
-    --     ['Content-type'] = 'application/json'
-    --   },
-    --   ['body'] = hive.to_json({
-    --     ['code'] = 404,
-    --     ['data'] = '',
-    --     ['message'] = 'not found'
-    --   })
-    -- }
   end
 end
 
--- return exec, exception
-local s = hive.server():bind("127.0.0.1", 3000):exception(exception):serve(exec)
+-- 不支持热更新，但速度更快
+local function execute(is_exist, func, middleware, req, router_params)
+  local params = { _request = req, _router_params = router_params }
+  if is_exist then
+    if middleware ~= nil then
+      local is_pass = false
+      is_pass, params._user_info = middleware(req)
+      if not is_pass then
+        local res = { code = 5001, message = 'Failed to verify token', data = '' }
+        return hive.response.new():status(200):headers({
+          ['Content-type'] = 'application/json'
+        }):body(res)
+      end
+    end
+    return func(params)
+  else
+    return hive.response.new():status(404):headers({
+      ['Content-type'] = 'application/json'
+    }):body({
+      ['code'] = 404,
+      ['data'] = '',
+      ['message'] = 'Not Found'
+    })
+  end
+end
+
+-- 如果没有开启dev_mode特性，使用这个
+local s = hive.server():bind("127.0.0.1", 3000):router(router:raw()):exception(exception):serve(execute)
+-- 如果开启dev_mode特性，使用这个
+-- local s = hive.server():bind("127.0.0.1", 3000):exception(exception):serve(dev_exec) -- 开发环境下使用这个，支持自动热更新
 return s:run()

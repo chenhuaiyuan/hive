@@ -33,13 +33,22 @@ function server:serve(service)
   return self
 end
 
+---路由
+---@param router userdata
+---@return table
+function server:router(router)
+  self._router = router
+  return self
+end
+
 function server:run()
   return {
     ['addr'] = self._addr,
     ['port'] = self._port,
     ['exception'] = self._exception,
     ['serve'] = self._serve,
-    ['is_ipv4'] = self._is_ipv4
+    ['is_ipv4'] = self._is_ipv4,
+    ['router'] = self._router
   }
 end
 

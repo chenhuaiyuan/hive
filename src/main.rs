@@ -8,26 +8,16 @@ mod js;
 mod lua;
 mod request;
 
-#[cfg(feature = "lua")]
-use crate::error::create_error;
-
 use crate::error::Result as WebResult;
 #[cfg(feature = "create_object")]
 use crate::init_project::create_project;
-#[cfg(feature = "mysql")]
-use crate::lua::mysql_async::create_mysql;
-// use crate::lua::mysql_sqlx::create_sqlx;
-#[cfg(feature = "lua_file_data")]
-use crate::lua::file_data::FileData;
-use crate::lua::json::create_empty_array;
+
 #[cfg(feature = "lua_hotfix")]
 use crate::lua::notify::async_watch;
-#[cfg(feature = "lua")]
-use crate::lua::server::create_server;
+
 #[cfg(feature = "lua")]
 use crate::lua::service::MakeSvc;
-#[cfg(feature = "ws")]
-use crate::lua::ws::create_message;
+
 use clap::Parser;
 #[cfg(feature = "hive_log")]
 use fast_log::{
@@ -73,54 +63,27 @@ pub struct Args {
     custom_params: Option<String>,
 }
 
-// 自定义参数处理
-// 例如：a=123&b=456
-fn custom_params_parse(lua: &Lua, params: String) -> LuaResult<LuaTable> {
-    let table = lua.create_table()?;
-    let params: Vec<&str> = params.split('&').collect();
-    for param in params {
-        let p: Vec<&str> = param.split('=').collect();
-        table.set(p[0], p[1])?;
-    }
-    Ok(table)
-}
-
 #[cfg(feature = "lua")]
 async fn lua_run(args: Args) -> WebResult<()> {
-    use crate::lua::{response::HiveResponseBuilder, router::create_router};
+    use crate::lua::{hive_func::add_hive_func, router::HiveRouter};
 
     let lua: Arc<Lua> = unsafe { Arc::new(Lua::unsafe_new()) };
 
     let lua_clone = lua.clone();
     let globals: LuaTable = lua_clone.globals();
-
-    let hive: LuaTable = lua.create_table()?;
-
-    hive.set("empty_array", create_empty_array(&lua)?)?;
-    #[cfg(feature = "lua_file_data")]
-    hive.set("file_data", lua.create_proxy::<FileData>()?)?;
-    hive.set("web_error", create_error(&lua)?)?;
-    if let Some(ref custom_params) = args.custom_params {
-        let env = custom_params_parse(&lua, custom_params.clone())?;
-        env.set("dev", args.dev)?;
-        hive.set("env", env)?;
-    } else {
-        hive.set("env", lua.create_table_from([("dev", args.dev)])?)?;
-    }
-    hive.set("version", lua.create_string(env!("CARGO_PKG_VERSION"))?)?;
-    hive.set("server", create_server(&lua)?)?;
-    #[cfg(feature = "ws")]
-    hive.set("ws_message", create_message(&lua)?)?;
-    #[cfg(feature = "mysql")]
-    hive.set("mysql", create_mysql(&lua)?)?;
-    hive.set("router", create_router(&lua)?)?;
-    hive.set("response", lua.create_proxy::<HiveResponseBuilder>()?)?;
+    let hive = add_hive_func(&lua, args.dev, args.custom_params.clone())?;
     globals.set("hive", hive)?;
 
     let file: Vec<u8> = fs::read(args.file.clone()).expect("read file failed");
 
     let handler: LuaTable = lua.load(&file).eval_async().await?;
 
+    #[cfg(not(feature = "dev_mode"))]
+    let router: LuaAnyUserData = handler.get("router")?;
+    #[cfg(not(feature = "dev_mode"))]
+    let router = Some(Arc::new(router.take::<HiveRouter>()?));
+    #[cfg(feature = "dev_mode")]
+    let router = None;
     let is_ipv4: bool = handler.get("is_ipv4").unwrap_or(true);
     let localhost: String = handler.get("addr").unwrap_or("127.0.0.1".to_owned());
     let port: u16 = handler.get("port").unwrap_or(3000);
@@ -130,16 +93,28 @@ async fn lua_run(args: Args) -> WebResult<()> {
         SocketAddr::new(IpAddr::V6(localhost.parse()?), port)
     };
     println!("Listening on http://{addr}");
+    #[cfg(feature = "add_entrance")]
     let http_handler = lua.create_registry_value(handler.get::<_, LuaFunction>("serve")?)?;
+    #[cfg(feature = "add_entrance")]
     let http_handler = Arc::new(http_handler);
     let exception = lua.create_registry_value(handler.get::<_, LuaFunction>("exception")?)?;
     let exception = Arc::new(exception);
     if args.dev {
-        let server = Server::bind(&addr).executor(LocalExec).serve(MakeSvc {
+        #[cfg(feature = "add_entrance")]
+        let make_svc = MakeSvc {
             lua: lua.clone(),
-            handler: http_handler,
+            handler: Some(http_handler),
             exception,
-        });
+            router,
+        };
+        #[cfg(not(feature = "add_entrance"))]
+        let make_svc = MakeSvc {
+            lua: lua.clone(),
+            handler: None,
+            exception,
+            router,
+        };
+        let server = Server::bind(&addr).executor(LocalExec).serve(make_svc);
         let local = tokio::task::LocalSet::new();
         #[cfg(feature = "lua_hotfix")]
         {
@@ -154,11 +129,21 @@ async fn lua_run(args: Args) -> WebResult<()> {
             local.run_until(server).await.unwrap();
         }
     } else {
-        let server = Server::bind(&addr).executor(LocalExec).serve(MakeSvc {
+        #[cfg(feature = "add_entrance")]
+        let make_svc = MakeSvc {
             lua: lua.clone(),
-            handler: http_handler,
+            handler: Some(http_handler),
             exception,
-        });
+            router,
+        };
+        #[cfg(not(feature = "add_entrance"))]
+        let make_svc = MakeSvc {
+            lua: lua.clone(),
+            handler: None,
+            exception,
+            router,
+        };
+        let server = Server::bind(&addr).executor(LocalExec).serve(make_svc);
         let local = tokio::task::LocalSet::new();
         local.run_until(server).await.unwrap();
     }

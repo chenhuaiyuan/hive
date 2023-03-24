@@ -82,9 +82,9 @@ impl LuaUserData for HS256 {
                         let val = lua.to_value(&val)?;
                         res.set(key, val)?;
                     }
-                    Ok((LuaValue::Boolean(true), res))
+                    Ok((true, res))
                 }
-                Err(_) => Ok((LuaValue::Boolean(false), lua.create_table()?)),
+                Err(_) => Ok((false, lua.create_table()?)),
             }
         });
     }

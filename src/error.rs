@@ -26,8 +26,8 @@ use zip::result::ZipError;
 
 #[derive(Debug)]
 pub struct Error {
-    code: u16,
-    message: String,
+    pub code: u16,
+    pub message: String,
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

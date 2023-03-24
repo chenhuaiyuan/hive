@@ -13,17 +13,19 @@
 
 ## feature
 
-默认只开启lua特性
+默认只开启lua和add_entrance特性
 
-| feature       | 功能                | 开启方法:                       |
-| ------------- | ------------------ | ------------------------------ |
-| lua_hotfix    | 开启dev模式下热更新   | --features "lua lua_hotfix"    |
-| ws            | 开启websocket功能    | --features "lua ws"            |
-| mysql         | 开启mysql功能        | --features "lua mysql"         |
-| h2            | 开启http2功能(未完成) | --features "lua h2"            |
-| create_object | 允许使用--create命令  | --features "lua create_object" |
-| hive_log      | 开启log功能          | --features "lua hive_log"      |
-| lua_file_data | 开启此功能可以实现上传和下载文件功能，如果不使用上传和下载功能，可以不用开启，使form表单提交速度更快 | --features "lua lua_file_data" |
+| feature       | 功能                | 开启方法:                                    |
+| ------------- | ------------------ | ------------------------------------------- |
+| lua_hotfix    | 开启dev模式下热更新   | --features "lua add_entrance lua_hotfix"    |
+| ws            | 开启websocket功能    | --features "lua add_entrance ws"            |
+| mysql         | 开启mysql功能        | --features "lua add_entrance mysql"         |
+| h2            | 开启http2功能(未完成) | --features "lua add_entrance h2"            |
+| create_object | 允许使用--create命令  | --features "lua add_entrance create_object" |
+| hive_log      | 开启log功能          | --features "lua add_entrance hive_log"      |
+| lua_file_data | 开启此功能可以实现上传和下载文件功能，如果不使用上传和下载功能，可以不用开启，使form表单提交速度更快 | --features "lua add_entrance lua_file_data" |
+| dev_mode      | 开启此功能才能支持dev模式下热更新 | --features "lua add_entrance dev_mode" |
+| add_entrance  | 开启框架入口函数，目前开启性能更好 | --features "lua add_entrance"      |
 
 ## 自带库安装
 
