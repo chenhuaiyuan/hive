@@ -65,7 +65,9 @@ pub struct Args {
 
 #[cfg(feature = "lua")]
 async fn lua_run(args: Args) -> WebResult<()> {
-    use crate::lua::{hive_func::add_hive_func, router::HiveRouter};
+    use crate::lua::hive_func::add_hive_func;
+    #[cfg(not(feature = "lua_hotfix"))]
+    use crate::lua::router::HiveRouter;
 
     let lua: Arc<Lua> = unsafe { Arc::new(Lua::unsafe_new()) };
 
@@ -78,11 +80,11 @@ async fn lua_run(args: Args) -> WebResult<()> {
 
     let handler: LuaTable = lua.load(&file).eval_async().await?;
 
-    #[cfg(not(feature = "dev_mode"))]
+    #[cfg(not(feature = "lua_hotfix"))]
     let router: LuaAnyUserData = handler.get("router")?;
-    #[cfg(not(feature = "dev_mode"))]
+    #[cfg(not(feature = "lua_hotfix"))]
     let router = Some(Arc::new(router.take::<HiveRouter>()?));
-    #[cfg(feature = "dev_mode")]
+    #[cfg(feature = "lua_hotfix")]
     let router = None;
     let is_ipv4: bool = handler.get("is_ipv4").unwrap_or(true);
     let localhost: String = handler.get("addr").unwrap_or("127.0.0.1".to_owned());

@@ -44,7 +44,7 @@ impl Service<Request<Body>> for Svc {
         let lua_req: LuaRequest = LuaRequest::new(req, self.remote_addr);
         let handler = self.handler.clone();
         let exception = self.exception.clone();
-        let router = self.router.clone();
+        let _router = self.router.clone();
         log::info!(
             "Request -- remote address: {}, method: {}, uri: {}",
             self.remote_addr,
@@ -68,10 +68,10 @@ impl Service<Request<Body>> for Svc {
 
             let exception: LuaFunction = lua.registry_value(&exception)?;
 
-            #[cfg(not(feature = "dev_mode"))]
+            #[cfg(not(feature = "lua_hotfix"))]
             {
                 let lua_req = lua.create_userdata(lua_req)?;
-                if let Some(router) = router {
+                if let Some(router) = _router {
                     match router
                         .execute(method, path, lua_req, exception.clone(), handler)
                         .await
@@ -112,7 +112,7 @@ impl Service<Request<Body>> for Svc {
                     Ok(Response::new(Body::empty()))
                 }
             }
-            #[cfg(feature = "dev_mode")]
+            #[cfg(feature = "lua_hotfix")]
             if let Some(handler) = handler {
                 match handler.call_async((method, path, lua_req)).await {
                     Ok(lua_resp) => match lua_resp {
@@ -152,7 +152,7 @@ impl Service<Request<Body>> for Svc {
     }
 }
 
-#[cfg(feature = "dev_mode")]
+#[cfg(feature = "lua_hotfix")]
 fn return_err_info(err: LuaError) -> (u16, String) {
     match err {
         LuaError::SyntaxError {

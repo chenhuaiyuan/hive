@@ -18,7 +18,6 @@ create_object = ["downloader", "zip"]
 hive_log = ["fast_log"]
 lua_file_data = []
 add_entrance = []  # 此特性为了实现自定义入口
-dev_mode = [] # 支持热更新，不考虑性能，主要用于开发
 
 [dependencies]
 tokio = { version = "1", features = ["fs", "io-util", "io-std", "macros", "rt", "net", "sync", "rt-multi-thread", "process"] }

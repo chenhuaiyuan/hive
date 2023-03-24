@@ -17,7 +17,7 @@ local function dev_exec(method, path, req)
   local params = { _request = req }
   local handler = router:execute(method, path)
   if handler.is_exist then
-    params.router_params = handler.router_params
+    params._router_params = handler.router_params
     if handler.middleware ~= nil then
       local is_pass = false;
       is_pass, params._user_info = handler.middleware(req)
@@ -66,8 +66,8 @@ local function execute(is_exist, func, middleware, req, router_params)
   end
 end
 
--- 如果没有开启dev_mode特性，使用这个
+-- 如果没有开启lua_hotfix特性，使用这个
 local s = hive.server():bind("127.0.0.1", 3000):router(router:raw()):exception(exception):serve(execute)
--- 如果开启dev_mode特性，使用这个
+-- 如果开启lua_hotfix特性，使用这个
 -- local s = hive.server():bind("127.0.0.1", 3000):exception(exception):serve(dev_exec) -- 开发环境下使用这个，支持自动热更新
 return s:run()

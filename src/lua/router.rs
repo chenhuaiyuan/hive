@@ -9,6 +9,7 @@ type Router =
 pub struct HiveRouter(Router);
 
 impl HiveRouter {
+    #[allow(dead_code)]
     pub async fn execute<'a>(
         &'a self,
         method: String,
