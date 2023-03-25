@@ -7,7 +7,6 @@
 
 - [ ] http2.0支持
 - [x] lua dev 模式下自动热更新
-- [ ] lua release 模式下重载
 - [x] websocket(可以使用，还有需要优化的地方)
 - [ ] js支持（使用v8引擎）
 

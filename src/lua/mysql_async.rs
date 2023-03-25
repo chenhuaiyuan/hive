@@ -341,8 +341,7 @@ fn lua_value_to_mysql_value(val: LuaValue) -> MysqlValue {
         LuaValue::Integer(v) => MysqlValue::Int(v),
         LuaValue::Number(v) => MysqlValue::Double(v),
         LuaValue::String(v) => {
-            let data = v.as_bytes();
-            let data = Vec::from(data);
+            let data = v.as_bytes().to_vec();
             MysqlValue::Bytes(data)
         }
         LuaValue::Table(_) => MysqlValue::NULL,
