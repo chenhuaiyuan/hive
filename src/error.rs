@@ -6,9 +6,9 @@ use std::sync::Arc;
 use downloader::Error as DownloaderError;
 #[cfg(feature = "hive_log")]
 use fast_log::error::LogError;
-use hyper::Error as HyperError;
+use hyper::{Body, Error as HyperError};
 
-use http::Error as HttpError;
+use http::{Error as HttpError, Response};
 #[cfg(feature = "lua")]
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use multer::Error as MulterError;
@@ -57,6 +57,18 @@ impl Error {
             code: 3000u16,
             message: error.to_string(),
         }
+    }
+
+    pub fn to_response(&self, status: u16) -> Result<Response<Body>> {
+        let body = format!(
+            r#"{{"code": "{}", "message": "{}"}}"#,
+            self.code, self.message
+        );
+        let response = Response::builder()
+            .status(status)
+            .header("Content-Type", "application/json")
+            .body(Body::from(body))?;
+        Ok(response)
     }
 
     // pub(crate) fn invalid_form_content_type() -> Self {
