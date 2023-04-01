@@ -13,7 +13,8 @@ local orm = {
   _engine = nil,
   _database = '',
   _table = '',
-  _params = {}
+  _params = {},
+  _where_left_bracket = false
 }
 
 local _type = {
@@ -117,32 +118,63 @@ function orm:columns(...)
   return self
 end
 
-function orm:raw_columns(...)
+function orm:unchecked_columns(...)
   self._columns = { ... }
   return self
 end
 
+function orm:where_right_bracket()
+  self._wheres = self._wheres .. ') '
+end
+
 ---数据库条件
----@param key string
+---@param key string | function
 ---@param operator any
 ---@param val any|nil
 ---@return table
 function orm:where(key, operator, val)
+  if type(key) == 'function' then
+    self._where_left_bracket = true
+    key(self):where_right_bracket()
+    return self
+  end
   if self._wheres == nil then
-    if val ~= nil then
-      self._wheres = ' WHERE ' .. key .. operator .. ' ? '
-      insert(self._params, val)
+    if self._where_left_bracket then
+      self._where_left_bracket = false
+      if val ~= nil then
+        self._wheres = ' WHERE (' .. key .. operator .. ' ? '
+        insert(self._params, val)
+      else
+        self._wheres = ' WHERE (' .. key .. ' = ? '
+        insert(self._params, operator)
+      end
     else
-      self._wheres = ' WHERE ' .. key .. ' = ? '
-      insert(self._params, operator)
+      if val ~= nil then
+        self._wheres = ' WHERE ' .. key .. operator .. ' ? '
+        insert(self._params, val)
+      else
+        self._wheres = ' WHERE ' .. key .. ' = ? '
+        insert(self._params, operator)
+      end
     end
   else
-    if val ~= nil then
-      self._wheres = self._wheres .. ' AND ' .. key .. operator .. ' ? '
-      insert(self._params, val)
+    if self._where_left_bracket then
+      self._where_left_bracket = false
+      if val ~= nil then
+        self._wheres = self._wheres .. ' AND (' .. key .. operator .. ' ? '
+        insert(self._params, val)
+      else
+        self._wheres = self._wheres .. ' AND (' .. key .. ' = ? '
+        insert(self._params, operator)
+      end
     else
-      self._wheres = self._wheres .. ' AND ' .. key .. ' = ? '
-      insert(self._params, operator)
+      if val ~= nil then
+        self._wheres = self._wheres .. ' AND ' .. key .. operator .. ' ? '
+        insert(self._params, val)
+      else
+        self._wheres = self._wheres .. ' AND ' .. key .. ' = ? '
+        insert(self._params, operator)
+      end
     end
   end
   return self
@@ -155,20 +187,42 @@ end
 ---@return table
 function orm:or_where(key, operator, val)
   if self._wheres == nil then
-    if val ~= nil then
-      self._wheres = ' WHERE ' .. key .. operator .. ' ? '
-      insert(self._params, val)
+    if self._where_left_bracket then
+      self._where_left_bracket = false
+      if val ~= nil then
+        self._wheres = ' WHERE (' .. key .. operator .. ' ? '
+        insert(self._params, val)
+      else
+        self._wheres = ' WHERE (' .. key .. ' = ? '
+        insert(self._params, operator)
+      end
     else
-      self._wheres = ' WHERE ' .. key .. ' = ? '
-      insert(self._params, operator)
+      if val ~= nil then
+        self._wheres = ' WHERE ' .. key .. operator .. ' ? '
+        insert(self._params, val)
+      else
+        self._wheres = ' WHERE ' .. key .. ' = ? '
+        insert(self._params, operator)
+      end
     end
   else
-    if val ~= nil then
-      self._wheres = self._wheres .. ' OR ' .. key .. operator .. ' ? '
-      insert(self._params, val)
+    if self._where_left_bracket then
+      self._where_left_bracket = false
+      if val ~= nil then
+        self._wheres = self._wheres .. ' OR (' .. key .. operator .. ' ? '
+        insert(self._params, val)
+      else
+        self._wheres = self._wheres .. ' OR (' .. key .. ' = ? '
+        insert(self._params, operator)
+      end
     else
-      self._wheres = self._wheres .. ' OR ' .. key .. ' = ? '
-      insert(self._params, operator)
+      if val ~= nil then
+        self._wheres = self._wheres .. ' OR ' .. key .. operator .. ' ? '
+        insert(self._params, val)
+      else
+        self._wheres = self._wheres .. ' OR ' .. key .. ' = ? '
+        insert(self._params, operator)
+      end
     end
   end
   return self
@@ -348,13 +402,13 @@ function orm:limit(offset, count)
     if nil ~= count then
       self._limit = ' LIMIT ' .. offset .. ', ' .. count .. ' '
     else
-      self.limit = ' LIMIT ' .. offset .. ' '
+      self._limit = ' LIMIT ' .. offset .. ' '
     end
   elseif self._type == _type.sqlite then
     if nil ~= count then
       self._limit = ' LIMIT ' .. count .. ' OFFSET ' .. offset .. ' '
     else
-      self.limit = ' LIMIT ' .. offset .. ' '
+      self._limit = ' LIMIT ' .. offset .. ' '
     end
   end
   return self
@@ -679,6 +733,35 @@ function orm:update(data)
   if self._wheres ~= nil then
     sql = sql .. self._wheres
   end
+  if self._limit ~= nil then
+    sql = sql .. self._limit
+  end
+  params = array_merge(params, self._params)
+  if self._type == _type.mysql then
+    return MYSQL:exec(sql, params)
+  elseif self._type == _type.sqlite then
+    return SQLITE:execute(sql, params)
+  end
+end
+
+function orm:raw_update(data)
+  local sql
+  if self._database ~= '' then
+    sql = 'UPDATE `' .. self._database .. '`.' .. self._table .. ' SET '
+  else
+    sql = 'UPDATE ' .. self._table .. ' SET '
+  end
+  for key, val in pairs(data) do
+    sql = sql .. ' `' .. key .. '` = ' .. val .. ','
+  end
+  sql = sub(sql, 1, -2)
+  if self._wheres ~= nil then
+    sql = sql .. self._wheres
+  end
+  if self._limit ~= nil then
+    sql = sql .. self._limit
+  end
+  local params = {}
   params = array_merge(params, self._params)
   if self._type == _type.mysql then
     return MYSQL:exec(sql, params)
