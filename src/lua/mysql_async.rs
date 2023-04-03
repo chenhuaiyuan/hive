@@ -244,7 +244,7 @@ fn mysql_value_to_lua_value(val: MysqlValue, lua: &Lua) -> LuaResult<LuaValue> {
                     let datetime = date.parse::<DateTimeUtc>();
                     match datetime {
                         Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
-                        Err(_) => Ok(LuaValue::Nil),
+                        Err(_) => Ok(LuaValue::Integer(0)),
                     }
                 }
                 LuaValue::String(v) => {
@@ -263,7 +263,7 @@ fn mysql_value_to_lua_value(val: MysqlValue, lua: &Lua) -> LuaResult<LuaValue> {
                         let datetime = date.parse::<DateTimeUtc>();
                         match datetime {
                             Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
-                            Err(_) => Ok(LuaValue::Nil),
+                            Err(_) => Ok(LuaValue::Integer(0)),
                         }
                     } else if ty == "string" {
                         let date: String = format!("{y}-{m:02}-{d:02} {h:02}:{min:02}:{s:02}");
@@ -277,7 +277,7 @@ fn mysql_value_to_lua_value(val: MysqlValue, lua: &Lua) -> LuaResult<LuaValue> {
                         let datetime = date.parse::<DateTimeUtc>();
                         match datetime {
                             Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
-                            Err(_) => Ok(LuaValue::Nil),
+                            Err(_) => Ok(LuaValue::Integer(0)),
                         }
                     }
                 }
@@ -286,7 +286,7 @@ fn mysql_value_to_lua_value(val: MysqlValue, lua: &Lua) -> LuaResult<LuaValue> {
                     let datetime = date.parse::<DateTimeUtc>();
                     match datetime {
                         Ok(val) => Ok(LuaValue::Integer(val.0.timestamp())),
-                        Err(_) => Ok(LuaValue::Nil),
+                        Err(_) => Ok(LuaValue::Integer(0)),
                     }
                 }
             }
