@@ -6,7 +6,7 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["lua", "add_entrance"]
+default = ["lua"]
 lua_hotfix = ["notify"]
 ws = ["tokio-tungstenite", "futures-channel", "tungstenite"]
 lua = ["mlua"]
@@ -17,7 +17,6 @@ h2 = ["hyper/http2"]
 create_object = ["downloader", "zip"]
 hive_log = ["fast_log"]
 lua_file_data = []
-add_entrance = []  # 此特性为了实现自定义入口
 
 [dependencies]
 tokio = { version = "1", features = ["fs", "io-util", "io-std", "macros", "rt", "net", "sync", "rt-multi-thread", "process"] }

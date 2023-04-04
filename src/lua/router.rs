@@ -28,84 +28,41 @@ impl HiveRouter {
                 for (key, val) in router_params.iter() {
                     params.insert(key, val);
                 }
-
-                #[cfg(not(feature = "add_entrance"))]
-                {
-                    let mut req =
-                        HashMap::from([("_request", LuaValue::UserData(request.clone()))]);
-                    if let Some(middleware) = middleware {
-                        let (is_pass, user): (bool, LuaValue) =
-                            middleware.call_async(request).await?;
-                        if is_pass {
-                            req.insert("_user_info", user);
-                        } else {
-                            let data = _exception
-                                .call_async((5001, "Failed to verify token"))
-                                .await?;
-                            return Ok(data);
-                        }
-                    }
-                    let data = func.call_async((req, params)).await?;
-                    Ok(data)
-                }
-                #[cfg(feature = "add_entrance")]
-                {
-                    if let Some(_next) = _next {
-                        let data = _next
-                            .call_async((true, func.clone(), middleware.clone(), request, params))
-                            .await?;
-                        Ok(data)
-                    } else {
-                        Ok(LuaValue::Nil)
-                    }
-                }
-            } else {
-                #[cfg(not(feature = "add_entrance"))]
-                {
-                    let data = _exception.call_async((404, "Not Found", 404)).await?;
-                    Ok(data)
-                }
-                #[cfg(feature = "add_entrance")]
-                {
-                    if let Some(_next) = _next {
-                        let data = _next
-                            .call_async((
-                                false,
-                                LuaValue::Nil,
-                                LuaValue::Nil,
-                                LuaValue::Nil,
-                                LuaValue::Nil,
-                            ))
-                            .await?;
-                        Ok(data)
-                    } else {
-                        Ok(LuaValue::Nil)
-                    }
-                }
-            }
-        } else {
-            #[cfg(not(feature = "add_entrance"))]
-            {
-                let data = _exception.call_async((404, "Not Found", 404)).await?;
-                Ok(data)
-            }
-            #[cfg(feature = "add_entrance")]
-            {
                 if let Some(_next) = _next {
                     let data = _next
-                        .call_async((
-                            false,
-                            LuaValue::Nil,
-                            LuaValue::Nil,
-                            LuaValue::Nil,
-                            LuaValue::Nil,
-                        ))
+                        .call_async((true, func.clone(), middleware.clone(), request, params))
                         .await?;
                     Ok(data)
                 } else {
                     Ok(LuaValue::Nil)
                 }
+            } else if let Some(_next) = _next {
+                let data = _next
+                    .call_async((
+                        false,
+                        LuaValue::Nil,
+                        LuaValue::Nil,
+                        LuaValue::Nil,
+                        LuaValue::Nil,
+                    ))
+                    .await?;
+                Ok(data)
+            } else {
+                Ok(LuaValue::Nil)
             }
+        } else if let Some(_next) = _next {
+            let data = _next
+                .call_async((
+                    false,
+                    LuaValue::Nil,
+                    LuaValue::Nil,
+                    LuaValue::Nil,
+                    LuaValue::Nil,
+                ))
+                .await?;
+            Ok(data)
+        } else {
+            Ok(LuaValue::Nil)
         }
     }
 }

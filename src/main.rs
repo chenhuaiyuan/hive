@@ -95,24 +95,14 @@ async fn lua_run(args: Args) -> WebResult<()> {
         SocketAddr::new(IpAddr::V6(localhost.parse()?), port)
     };
     println!("Listening on http://{addr}");
-    #[cfg(feature = "add_entrance")]
     let http_handler = lua.create_registry_value(handler.get::<_, LuaFunction>("serve")?)?;
-    #[cfg(feature = "add_entrance")]
     let http_handler = Arc::new(http_handler);
     let exception = lua.create_registry_value(handler.get::<_, LuaFunction>("exception")?)?;
     let exception = Arc::new(exception);
     if args.dev {
-        #[cfg(feature = "add_entrance")]
         let make_svc = MakeSvc {
             lua: lua.clone(),
             handler: Some(http_handler),
-            exception,
-            router,
-        };
-        #[cfg(not(feature = "add_entrance"))]
-        let make_svc = MakeSvc {
-            lua: lua.clone(),
-            handler: None,
             exception,
             router,
         };
@@ -131,17 +121,9 @@ async fn lua_run(args: Args) -> WebResult<()> {
             local.run_until(server).await.unwrap();
         }
     } else {
-        #[cfg(feature = "add_entrance")]
         let make_svc = MakeSvc {
             lua: lua.clone(),
             handler: Some(http_handler),
-            exception,
-            router,
-        };
-        #[cfg(not(feature = "add_entrance"))]
-        let make_svc = MakeSvc {
-            lua: lua.clone(),
-            handler: None,
             exception,
             router,
         };

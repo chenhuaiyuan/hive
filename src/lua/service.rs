@@ -54,14 +54,7 @@ impl Service<Request<Body>> for Svc {
 
         Box::pin(async move {
             let handler: Option<LuaFunction> = if let Some(_handler) = handler {
-                #[cfg(feature = "add_entrance")]
-                {
-                    Some(lua.registry_value(&_handler)?)
-                }
-                #[cfg(not(feature = "add_entrance"))]
-                {
-                    None
-                }
+                Some(lua.registry_value(&_handler)?)
             } else {
                 None
             };
@@ -88,7 +81,7 @@ impl Service<Request<Body>> for Svc {
                             }
                         },
                         Err(err) => {
-                            println!("{err:?}");
+                            // println!("{err:?}");
 
                             // let (code, message) = return_err_info(err);
                             log::error!("{}", err.message);
