@@ -6,5 +6,6 @@
   ],
   "Lua.diagnostics.disable": [
     "need-check-nil"
-  ]
+  ],
+  "rust-analyzer.showUnlinkedFileNotification": false
 }

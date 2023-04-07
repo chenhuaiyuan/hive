@@ -3,7 +3,7 @@ use crate::error::{Error as WebError, Result};
 use crate::lua::file_data::FileData;
 use http::{header, HeaderMap, HeaderValue, Method};
 use hyper::{body::Bytes, Body, Request as HyperRequest};
-#[cfg(feature = "lua")]
+#[cfg(any(feature = "lua", feature = "luajit"))]
 use multer::Multipart;
 use serde_json::Value as JsonValue;
 use std::{collections::HashMap, net::SocketAddr};

@@ -11,7 +11,7 @@ router:match('get', '/', test.index)
 -- router:match('GET', '/test', test.index, auth_token)
 router:match('get', '/get_user_info', test.get_user_info)
 router:match('get', '/test', test.test)
-router:match('get', '/template', test.template)
+-- router:match('get', '/template', test.template)
 router:match('get', '/ws', test.ws)
 
 return router

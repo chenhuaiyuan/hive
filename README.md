@@ -17,13 +17,15 @@
 
 | feature       | 功能                | 开启方法:                                    |
 | ------------- | ------------------ | ------------------------------------------- |
-| lua_hotfix    | 开启dev模式下热更新   | --features "lua lua_hotfix"    |
-| ws            | 开启websocket功能    | --features "lua ws"            |
-| mysql         | 开启mysql功能        | --features "lua mysql"         |
-| h2            | 开启http2功能(未完成) | --features "lua h2"            |
-| create_object | 允许使用--create命令  | --features "lua create_object" |
-| hive_log      | 开启log功能          | --features "lua hive_log"      |
-| lua_file_data | 开启此功能可以实现上传和下载文件功能，如果不使用上传和下载功能，可以不用开启，使form表单提交速度更快 | --features "lua lua_file_data" |
+| lua_hotfix    | 开启dev模式下热更新   | --features "lua_hotfix"    |
+| ws            | 开启websocket功能    | --features "ws"            |
+| mysql         | 开启mysql功能        | --features "mysql"         |
+| h2            | 开启http2功能(未完成) | --features "h2"            |
+| create_object | 允许使用--create命令  | --features "create_object" |
+| hive_log      | 开启log功能          | --features "hive_log"      |
+| lua_file_data | 开启此功能可以实现上传和下载文件功能，如果不使用上传和下载功能，可以不用开启，使form表单提交速度更快 | --features "lua_file_data" |
+| luajit        | 用luajit代替lua     | --features "luajit" --no-default-features |
+| lua           | 使用lua5.4，默认开启 | --features "lua"                |
 
 ## 自带库安装
 

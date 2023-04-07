@@ -1,6 +1,6 @@
 local _M = {}
 local valid = require 'utils.validation'
-local tera = require 'utils.tera'
+-- local tera = require 'utils.tera'
 -- local orm = loadfile 'orm/query.lua'
 local hive_response = hive.response
 
@@ -30,9 +30,9 @@ function _M.test(request)
 end
 
 -- 使用tera必须要先安装tera库，tera库在hive源代码的ext中
-function _M.template(request)
-  return _RESPONSE.html(tera:view('test.html', { context = 'hello world' }))
-end
+-- function _M.template(request)
+--   return _RESPONSE.html(tera:view('test.html', { context = 'hello world' }))
+-- end
 
 -- websocket，需要开启特定功能才能使用
 function _M.ws(request)

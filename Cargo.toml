@@ -9,7 +9,8 @@ edition = "2021"
 default = ["lua"]
 lua_hotfix = ["notify"]
 ws = ["tokio-tungstenite", "futures-channel", "tungstenite"]
-lua = ["mlua"]
+lua = ["mlua/lua54"]
+luajit = ["mlua/luajit"]
 js = ["v8"]
 # mysql = ["sqlx", "time"]
 mysql = ["mysql_async", "dateparser"]
@@ -20,7 +21,7 @@ lua_file_data = []
 
 [dependencies]
 tokio = { version = "1", features = ["fs", "io-util", "io-std", "macros", "rt", "net", "sync", "rt-multi-thread", "process"] }
-mlua = { version = "0.8", features = ["lua54", "async", "vendored", "serialize"], optional = true }
+mlua = { version = "0.8", features = ["async", "vendored", "serialize"], optional = true }
 hyper = { version = "0.14", features = ["server", "http1", "tcp", "stream"] }
 http = "0.2"
 # http-body = "0.4"
@@ -64,8 +65,8 @@ async-trait = "0.1"
 # sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls", "mysql", "time", "decimal" ], optional = true }
 # time = { version = "0.3.17", features = ["formatting", "parsing", "alloc"], optional = true }
 
-mysql_async = { version = "0.31.2", optional = true }
-dateparser = { version = "0.1", optional = true }
+mysql_async = { version = "0.31", optional = true }
+dateparser = { version = "0.2", optional = true }
 
 matchit = "0.7.0"
 
