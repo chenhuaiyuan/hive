@@ -6,10 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["lua"]
+default = ["lua54"]
 lua_hotfix = ["notify"]
 ws = ["tokio-tungstenite", "futures-channel", "tungstenite"]
-lua = ["mlua/lua54"]
+lua51 = ["mlua/lua51"]
+lua52 = ["mlua/lua52"]
+lua53 = ["mlua/lua53"]
+lua54 = ["mlua/lua54"]
+luau = ["mlua/luau"]
 luajit = ["mlua/luajit"]
 js = ["v8"]
 # mysql = ["sqlx", "time"]

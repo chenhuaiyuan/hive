@@ -13,7 +13,7 @@
 
 ## feature
 
-默认只开启lua
+默认只开启lua54
 
 | feature       | 功能                | 开启方法:                                    |
 | ------------- | ------------------ | ------------------------------------------- |
@@ -24,8 +24,12 @@
 | create_object | 允许使用--create命令  | --features "create_object" |
 | hive_log      | 开启log功能          | --features "hive_log"      |
 | lua_file_data | 开启此功能可以实现上传和下载文件功能，如果不使用上传和下载功能，可以不用开启，使form表单提交速度更快 | --features "lua_file_data" |
-| luajit        | 用luajit代替lua     | --features "luajit" --no-default-features |
-| lua           | 使用lua5.4，默认开启 | --features "lua"                |
+| luajit        | 用luajit代替lua      | --features "luajit" --no-default-features |
+| lua54         | 使用lua5.4，默认开启  | --features "lua54"          |
+| lua53         | 使用lua5.3           | --features "lua53" --no-default-features |
+| lua52         | 使用lua5.2           | --features "lua52" --no-default-features |
+| lua51         | 使用lua5.1           | --features "lua51" --no-default-features |
+| luau          | 使用luau             | --features "luau" --no-default-features  |
 
 ## 自带库安装
 

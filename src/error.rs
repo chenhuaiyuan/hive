@@ -7,7 +7,14 @@ use fast_log::error::LogError;
 use hyper::{Body, Error as HyperError};
 
 use http::{Error as HttpError, Response};
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use multer::Error as MulterError;
 #[cfg(feature = "lua_hotfix")]
@@ -30,7 +37,14 @@ pub struct Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 pub fn create_error(lua: &Lua) -> LuaResult<LuaFunction> {
     use std::sync::Arc;
     lua.create_function(|_, (code, message): (u16, String)| {
@@ -87,7 +101,14 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 impl From<MLuaError> for Error {
     fn from(value: MLuaError) -> Self {
         Self::new(2000, value.to_string())

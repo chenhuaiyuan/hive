@@ -1,4 +1,11 @@
-local server = { _is_ipv4 = true }
+local server = {
+  _is_ipv4 = true,
+  _addr = '127.0.0.1',
+  _port = 3000,
+  _exception = nil,
+  _serve = nil,
+  _router = nil
+}
 
 ---绑定ip和端口
 ---@param addr string

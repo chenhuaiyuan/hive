@@ -4,7 +4,14 @@ mod file_data;
 mod init_project;
 #[cfg(feature = "js")]
 mod js;
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 mod lua;
 mod request;
 
@@ -15,7 +22,14 @@ use crate::init_project::create_project;
 #[cfg(feature = "lua_hotfix")]
 use crate::lua::notify::async_watch;
 
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 use crate::lua::service::MakeSvc;
 
 use clap::Parser;
@@ -27,7 +41,14 @@ use fast_log::{
 };
 use futures_util::Future;
 use hyper::Server;
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 use mlua::prelude::*;
 use once_cell::sync::Lazy;
 use std::fs;
@@ -40,8 +61,17 @@ pub static HALF_NUM_CPUS: Lazy<usize> = Lazy::new(|| 1.max(num_cpus::get() / 2))
 #[derive(Parser, Debug, Clone)]
 pub struct Args {
     /// 读取的文件名
-    #[cfg(any(feature = "lua", feature = "luajit"))]
+    #[cfg(any(
+        feature = "lua51",
+        feature = "lua52",
+        feature = "lua53",
+        feature = "lua54",
+        feature = "luajit"
+    ))]
     #[arg(short, long, default_value = "index.lua")]
+    file: String,
+    #[cfg(feature = "luau")]
+    #[arg(short, long, default_value = "index.luau")]
     file: String,
     #[cfg(feature = "js")]
     #[arg(short, long, default_value = "index.js")]
@@ -63,7 +93,14 @@ pub struct Args {
     custom_params: Option<String>,
 }
 
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 async fn lua_run(args: Args) -> WebResult<()> {
     use crate::lua::hive_func::add_hive_func;
     #[cfg(not(feature = "lua_hotfix"))]
@@ -205,17 +242,38 @@ fn main() -> WebResult<()> {
 
     log::info!("app start...");
 
-    #[cfg(any(feature = "lua", feature = "luajit"))]
+    #[cfg(any(
+        feature = "lua51",
+        feature = "lua52",
+        feature = "lua53",
+        feature = "lua54",
+        feature = "luau",
+        feature = "luajit"
+    ))]
     block_on(lua_run(args))?;
     #[cfg(feature = "js")]
     block_on(v8_run(args))?;
     Ok(())
 }
 
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 #[derive(Clone, Copy, Debug)]
 pub struct LocalExec;
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 impl<F> hyper::rt::Executor<F> for LocalExec
 where
     F: std::future::Future + 'static, // not requiring `Send`

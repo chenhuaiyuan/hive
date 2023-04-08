@@ -1,7 +1,7 @@
 _RESPONSE = require 'response'
 local exception = dofile 'exception/base_exception.lua'
 require 'config'
-local query = loadfile 'orm/query.lua' -- 支持mysql和sqlite
+-- local query = loadfile 'orm/query.lua' -- 支持mysql和sqlite
 -- local mongo = require 'mongo'
 local router = require 'route'
 

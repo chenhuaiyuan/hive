@@ -37,7 +37,14 @@ impl FileData {
 
 // impl FileDataTrait for FileData {}
 
-#[cfg(any(feature = "lua", feature = "luajit"))]
+#[cfg(any(
+    feature = "lua51",
+    feature = "lua52",
+    feature = "lua53",
+    feature = "lua54",
+    feature = "luau",
+    feature = "luajit"
+))]
 impl LuaUserData for FileData {
     fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(_fields: &mut F) {
         _fields.add_field_method_get("field_name", |_, this| Ok(this.field_name.clone()));
