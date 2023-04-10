@@ -10,7 +10,8 @@ mod js;
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 mod lua;
 mod request;
@@ -28,7 +29,8 @@ use crate::lua::notify::async_watch;
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 use crate::lua::service::MakeSvc;
 
@@ -47,7 +49,8 @@ use hyper::Server;
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 use mlua::prelude::*;
 use once_cell::sync::Lazy;
@@ -66,7 +69,9 @@ pub struct Args {
         feature = "lua52",
         feature = "lua53",
         feature = "lua54",
-        feature = "luajit"
+        feature = "luau",
+        feature = "luajit",
+        feature = "luajit52"
     ))]
     #[arg(short, long, default_value = "index.lua")]
     file: String,
@@ -99,7 +104,8 @@ pub struct Args {
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 async fn lua_run(args: Args) -> WebResult<()> {
     use crate::lua::hive_func::add_hive_func;
@@ -262,7 +268,8 @@ fn main() -> WebResult<()> {
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 #[derive(Clone, Copy, Debug)]
 pub struct LocalExec;
@@ -272,7 +279,8 @@ pub struct LocalExec;
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 impl<F> hyper::rt::Executor<F> for LocalExec
 where

@@ -9,7 +9,8 @@ use hyper::{body::Bytes, Body, Request as HyperRequest};
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 use multer::Multipart;
 use serde_json::Value as JsonValue;

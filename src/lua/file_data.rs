@@ -43,7 +43,8 @@ impl FileData {
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 impl LuaUserData for FileData {
     fn add_fields<'lua, F: LuaUserDataFields<'lua, Self>>(_fields: &mut F) {

@@ -13,7 +13,8 @@ use http::{Error as HttpError, Response};
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 use mlua::prelude::{Lua, LuaError as MLuaError, LuaFunction, LuaResult};
 use multer::Error as MulterError;
@@ -43,7 +44,8 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 pub fn create_error(lua: &Lua) -> LuaResult<LuaFunction> {
     use std::sync::Arc;
@@ -107,7 +109,8 @@ impl std::error::Error for Error {}
     feature = "lua53",
     feature = "lua54",
     feature = "luau",
-    feature = "luajit"
+    feature = "luajit",
+    feature = "luajit52"
 ))]
 impl From<MLuaError> for Error {
     fn from(value: MLuaError) -> Self {

@@ -9,7 +9,6 @@
 - [ ] http2.0支持
 - [x] lua dev 模式下自动热更新
 - [x] websocket(可以使用，还有需要优化的地方)
-- [ ] js支持（使用v8引擎）
 
 ## feature
 
@@ -25,7 +24,8 @@
 | hive_log      | 开启log功能          | --features "hive_log"      |
 | lua_file_data | 开启此功能可以实现上传和下载文件功能，如果不使用上传和下载功能，可以不用开启，使form表单提交速度更快 | --features "lua_file_data" |
 | luajit        | 用luajit代替lua      | --features "luajit" --no-default-features |
-| lua54         | 使用lua5.4，默认开启  | --features "lua54"          |
+| luajit52      | 使用兼容lua52的luajit | --features "luajit52" --no-default-features |
+| lua54         | 使用lua5.4，默认启用  | --features "lua54"          |
 | lua53         | 使用lua5.3           | --features "lua53" --no-default-features |
 | lua52         | 使用lua5.2           | --features "lua52" --no-default-features |
 | lua51         | 使用lua5.1           | --features "lua51" --no-default-features |
@@ -50,18 +50,10 @@ git clone https://github.com/chenhuaiyuan/hive.git
 cd hive
 # lua
 # 使用lua运行时
-cargo install --path . # 在本地安装hive软件，但默认不开启websocket功能，如需要使用websocket，请运行下面命令行
-cargo install --path . --features "lua ws"
-
-# js 此功能还未完成，请不要运行以下命令
-# 使用v8运行时
-bash download_macos_rusty_v8.sh
-# 如果不是macos系统，可通过自己系统下载对应的librusty_v8.a，可以加快编译速度
-# https://github.com/denoland/rusty_v8/releases
-export RUSTY_V8_ARCHIVE=$HOME/.cache/rusty_v8/v0.61.0/librusty_v8_debug_x86_64-apple-darwin.a
-# or
-export RUSTY_V8_ARCHIVE=$HOME/.cache/rusty_v8/v0.61.0/librusty_v8_release_x86_64-apple-darwin.a
-cargo install --path . --features "js"
+cargo install --path . # 默认只启用lua虚拟机
+# 如果需要使用别的自带功能，可以通过--features
+# 比如：
+cargo install --path . --features "ws mysql hive_log"
 ```
 
 ### 安装自带的库
