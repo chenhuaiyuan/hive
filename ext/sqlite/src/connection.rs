@@ -1,5 +1,5 @@
 use mlua::prelude::*;
-use rusqlite::{params_from_iter, Connection};
+use rusqlite::{params_from_iter, Connection, OptionalExtension};
 use rusqlite::{types::Value as SqliteValue, OpenFlags};
 
 use crate::{flags::SqliteOpenFlags, sqlite_value_to_lua_value, table_to_params};
@@ -65,21 +65,25 @@ impl LuaUserData for SqliteConnection {
                 let params = table_to_params(params)?;
                 let params = params_from_iter(params);
                 let mut stmt = this.0.prepare(&sql).to_lua_err()?;
-                let mut rows = stmt.query(params).to_lua_err()?;
-                let table = lua.create_table()?;
-                let fields = table_to_vec!(query_field);
-                let mut idx = 1;
-                while let Some(row) = rows.next().to_lua_err()? {
-                    let sub_table = lua.create_table()?;
-                    for field in fields.iter() {
-                        let data: SqliteValue = row.get(field.as_str()).to_lua_err()?;
-                        let data = sqlite_value_to_lua_value(lua, data)?;
-                        sub_table.set(field.clone(), data)?;
+                let rows = stmt.query(params).optional().to_lua_err()?;
+                if let Some(mut rows) = rows {
+                    let table = lua.create_table()?;
+                    let fields = table_to_vec!(query_field);
+                    let mut idx = 1;
+                    while let Some(row) = rows.next().to_lua_err()? {
+                        let sub_table = lua.create_table()?;
+                        for field in fields.iter() {
+                            let data: SqliteValue = row.get(field.as_str()).to_lua_err()?;
+                            let data = sqlite_value_to_lua_value(lua, data)?;
+                            sub_table.set(field.clone(), data)?;
+                        }
+                        table.set(idx, sub_table)?;
+                        idx += 1;
                     }
-                    table.set(idx, sub_table)?;
-                    idx += 1;
+                    Ok(table)
+                } else {
+                    lua.create_table()
                 }
-                Ok(table)
             },
         );
         _methods.add_method_mut(
@@ -99,9 +103,13 @@ impl LuaUserData for SqliteConnection {
                         }
                         Ok(table)
                     })
+                    .optional()
                     .to_lua_err()?;
-
-                Ok(table)
+                if let Some(table) = table {
+                    Ok(table)
+                } else {
+                    lua.create_table()
+                }
             },
         );
         _methods.add_method_mut("insert", |_, this, (sql, params): (String, LuaTable)| {

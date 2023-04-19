@@ -18,6 +18,6 @@ luajit = ["mlua/luajit"]
 vendored = ["mlua/vendored"]
 
 [dependencies]
-rusqlite = {version = "0.28.0"}
+rusqlite = {version = "0.29.0"}
 
 mlua = { version = "0.8", features = ["module"] }
