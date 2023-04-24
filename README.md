@@ -8,7 +8,7 @@
 
 - [ ] http2.0支持
 - [x] lua dev 模式下自动热更新
-- [x] websocket(可以使用，还有需要优化的地方)
+- [x] websocket
 
 ## feature
 

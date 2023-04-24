@@ -10,6 +10,8 @@ use http::header::{
 #[cfg(feature = "ws")]
 use http::Method;
 #[cfg(feature = "ws")]
+use http::Response;
+#[cfg(feature = "ws")]
 use http::{HeaderValue, StatusCode, Version};
 use hyper::{Body, Request as HyperRequest};
 use mlua::prelude::*;
@@ -23,6 +25,9 @@ use tokio_tungstenite::WebSocketStream;
 use tungstenite::handshake::derive_accept_key;
 #[cfg(feature = "ws")]
 use tungstenite::protocol::Role;
+
+#[cfg(feature = "ws")]
+use super::response::HiveResponse;
 
 pub struct LuaRequest(Request);
 
@@ -163,7 +168,7 @@ impl LuaUserData for LuaRequest {
         #[cfg(feature = "ws")]
         _methods.add_async_function(
             "upgrade",
-            |lua, (this, func): (LuaAnyUserData, LuaFunction)| async move {
+            |_, (this, func): (LuaAnyUserData, LuaFunction)| async move {
                 let this = this.take::<Self>()?;
                 let upgrade = HeaderValue::from_static("Upgrade");
                 let websocket = HeaderValue::from_static("websocket");
@@ -196,9 +201,9 @@ impl LuaUserData for LuaRequest {
                         "Please check whether the parameter transfer is correct",
                     ))))
                 } else {
-                    // let ver = this.0.version();
+                    let ver = this.0.req.version();
                     let mut req = this.0.req;
-                    let func: LuaFunction<'a> = unsafe { std::mem::transmute(func) };
+                    let func: LuaFunction<'static> = unsafe { std::mem::transmute(func) };
                     tokio::task::spawn_local(async move {
                         match hyper::upgrade::on(&mut req).await {
                             Ok(upgraded) => {
@@ -214,21 +219,15 @@ impl LuaUserData for LuaRequest {
                             Err(e) => println!("upgrade error: {e}"),
                         }
                     });
-                    let res = lua.create_table()?;
-                    let headers = lua.create_table()?;
-                    res.set(
-                        "status",
-                        LuaValue::Integer(StatusCode::SWITCHING_PROTOCOLS.as_u16() as i64),
-                    )?;
-                    res.set("version", lua.create_string("HTTP/1.1")?)?;
-                    headers.set(CONNECTION.as_str(), lua.create_string(upgrade.as_bytes())?)?;
-                    headers.set(UPGRADE.as_str(), lua.create_string(websocket.as_bytes())?)?;
-                    headers.set(
-                        SEC_WEBSOCKET_ACCEPT.as_str(),
-                        lua.create_string(&derived.unwrap())?,
-                    )?;
-                    res.set("headers", LuaValue::Table(headers))?;
-                    Ok(res)
+                    let response = Response::builder()
+                        .status(StatusCode::SWITCHING_PROTOCOLS)
+                        .version(ver)
+                        .header(CONNECTION, upgrade)
+                        .header(UPGRADE, websocket)
+                        .header(SEC_WEBSOCKET_ACCEPT, derived.unwrap())
+                        .body(Body::empty())
+                        .to_lua_err()?;
+                    Ok(HiveResponse(response))
                 }
             },
         );

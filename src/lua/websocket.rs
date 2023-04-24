@@ -107,7 +107,7 @@ pub async fn handle_connection(
     ws_stream: WebSocketStream<Upgraded>,
     addr: SocketAddr,
 ) -> LuaResult<()> {
-    println!("WebSocket connection established: {addr}");
+    // println!("WebSocket connection established: {addr}");
 
     let (tx, rx) = unbounded::<Message>();
 
@@ -128,6 +128,9 @@ pub async fn handle_connection(
 
     pin_mut!(broadcast_incoming, receive_from_others);
     future::select(broadcast_incoming, receive_from_others).await;
+
+    drop(handler);
+    SUBSCRIBERS.lock().unwrap().remove(&addr);
 
     Ok(())
 }
