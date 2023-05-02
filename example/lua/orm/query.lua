@@ -6,7 +6,7 @@ local reverse = string.reverse
 local concat = table.concat
 local sub = string.sub
 local find = string.find
--- local p = require 'utils.print_table'
+local p = require 'utils.print_table'
 
 local orm = {
   _type = 'mysql',
@@ -157,7 +157,7 @@ function orm:where(key, operator, val)
         self._wheres = self._wheres .. '('
       end
       if val ~= nil then
-        self._wheres = self._wheres .. key .. operator .. ' ? '
+        self._wheres = self._wheres .. key .. ' ' .. operator .. ' ? '
         insert(self._params, val)
       else
         self._wheres = self._wheres .. key .. ' = ? '
@@ -165,7 +165,7 @@ function orm:where(key, operator, val)
       end
     else
       if val ~= nil then
-        self._wheres = ' WHERE ' .. key .. operator .. ' ? '
+        self._wheres = ' WHERE ' .. key .. ' ' .. operator .. ' ? '
         insert(self._params, val)
       else
         self._wheres = ' WHERE ' .. key .. ' = ? '
@@ -180,7 +180,7 @@ function orm:where(key, operator, val)
         self._wheres = self._wheres .. '('
       end
       if val ~= nil then
-        self._wheres = self._wheres .. key .. operator .. ' ? '
+        self._wheres = self._wheres .. key .. ' ' .. operator .. ' ? '
         insert(self._params, val)
       else
         self._wheres = self._wheres .. key .. ' = ? '
@@ -188,7 +188,7 @@ function orm:where(key, operator, val)
       end
     else
       if val ~= nil then
-        self._wheres = self._wheres .. ' AND ' .. key .. operator .. ' ? '
+        self._wheres = self._wheres .. ' AND ' .. key .. ' ' .. operator .. ' ? '
         insert(self._params, val)
       else
         self._wheres = self._wheres .. ' AND ' .. key .. ' = ? '
@@ -213,7 +213,7 @@ function orm:or_where(key, operator, val)
         self._wheres = self._wheres .. '('
       end
       if val ~= nil then
-        self._wheres = self._wheres .. key .. operator .. ' ? '
+        self._wheres = self._wheres .. key .. ' ' .. operator .. ' ? '
         insert(self._params, val)
       else
         self._wheres = self._wheres .. key .. ' = ? '
@@ -221,7 +221,7 @@ function orm:or_where(key, operator, val)
       end
     else
       if val ~= nil then
-        self._wheres = ' WHERE ' .. key .. operator .. ' ? '
+        self._wheres = ' WHERE ' .. key .. ' ' .. operator .. ' ? '
         insert(self._params, val)
       else
         self._wheres = ' WHERE ' .. key .. ' = ? '
@@ -236,7 +236,7 @@ function orm:or_where(key, operator, val)
         self._wheres = self._wheres .. '('
       end
       if val ~= nil then
-        self._wheres = self._wheres .. key .. operator .. ' ? '
+        self._wheres = self._wheres .. key .. ' ' .. operator .. ' ? '
         insert(self._params, val)
       else
         self._wheres = self._wheres .. key .. ' = ? '
@@ -244,7 +244,7 @@ function orm:or_where(key, operator, val)
       end
     else
       if val ~= nil then
-        self._wheres = self._wheres .. ' OR ' .. key .. operator .. ' ? '
+        self._wheres = self._wheres .. ' OR ' .. key .. ' ' .. operator .. ' ? '
         insert(self._params, val)
       else
         self._wheres = self._wheres .. ' OR ' .. key .. ' = ? '
@@ -552,6 +552,7 @@ function orm:find(...)
     data = MYSQL:exec_first(sql, self._params)
   elseif self._type == _type.sqlite then
     data = SQLITE:query_first(sql, self._params, columns)
+    p.print_table(data)
   end
   return data
 end
